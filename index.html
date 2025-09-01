@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Practice Test — Student</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
+</head>
+<body>
+  <main class="container">
+    <h1>Practice Test</h1>
+
+    <section id="controls">
+      <label for="topicSelect">Choose topic:</label>
+      <select id="topicSelect"><option>Loading topics...</option></select>
+      <label for="numQ">Number of questions:</label>
+      <input id="numQ" type="number" min="1" max="50" value="5" />
+      <button id="startBtn">Start Quiz</button>
+    </section>
+
+    <section id="quizArea" style="display:none;">
+      <div id="quiz"></div>
+      <button id="submitBtn">Submit</button>
+      <div id="score" style="margin-top:1rem;"></div>
+    </section>
+
+    <footer>
+      <small>Admin? <a href="admin.html">Open admin panel</a></small>
+    </footer>
+  </main>
+
+<script>
+  // CONFIG - replace with your project's values
+  const SUPABASE_URL = "https://YOUR_SUPABASE_URL.supabase.co";
+  const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+
+  const supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // DOM
+  const topicSelect = document.getElementById('topicSelect');
+  const startBtn = document.getElementById('startBtn');
+  const numQ = document.getElementById('numQ');
+  const quizArea = document.getElementById('quizArea');
+  const quizDiv = document.getElementById('quiz');
+  const submitBtn = document.getElementById('submitBtn');
+  const scoreDiv = document.getElementById('score');
+
+  // load distinct topics
+  async function loadTopics() {
+    // fetch topics (distinct)
+    const { data, error } = await supabase
+      .rpc('get_distinct_topics') // we'll fallback if RPC not present
+      .catch(()=>null);
+
+    if (data && data.length) {
+      populateTopics(data.map(r=>r.topic));
+      return;
+    }
+
+    // fallback: fetch all topics and dedupe client-side
+    const res = await supabase.from('questions').select('topic');
+    if (res.error) {
+      topicSelect.innerHTML = `<option>Error loading topics</option>`;
+      console.error(res.error);
+      return;
+    }
+    const topics = [...new Set(res.data.map(r=>r.topic))];
+    populateTopics(topics);
+  }
+
+  function populateTopics(topics){
+    topicSelect.innerHTML = '';
+    topics.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = t;
+      topicSelect.appendChild(opt);
+    });
+  }
+
+  // shuffle helper
+  function shuffle(arr){
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  async function startQuiz(){
+    const topic = topicSelect.value;
+    const n = Math.max(1, Math.min(50, parseInt(numQ.value || 5)));
+
+    // get questions for topic
+    const { data, error } = await supabase
+      .from('questions')
+      .select('*')
+      .eq('topic', topic);
+
+    if (error) {
+      alert('Error loading questions: ' + error.message);
+      return;
+    }
+    if (!data || data.length === 0) {
+      alert('No questions for this topic.');
+      return;
+    }
+
+    const chosen = shuffle([...data]).slice(0, n);
+    renderQuestions(chosen);
+  }
+
+  function renderQuestions(questions){
+    quizArea.style.display = 'block';
+    quizDiv.innerHTML = '';
+    scoreDiv.textContent = '';
+
+    questions.forEach((q, i) => {
+      const qDiv = document.createElement('div');
+      qDiv.className = 'question';
+      qDiv.innerHTML = `<p class="qtext">${i+1}. ${escapeHtml(q.question_text)}</p>`;
+      const ul = document.createElement('div');
+      ul.className = 'choices';
+      let choices = q.choices;
+      if (typeof choices === 'string') {
+        try { choices = JSON.parse(choices); } catch(e){}
+      }
+      choices = shuffle([...choices]);
+      choices.forEach(c => {
+        const id = `q${i}-${Math.random().toString(36).slice(2,8)}`;
+        const label = document.createElement('label');
+        label.innerHTML = `<input type="radio" name="q${i}" value="${escapeHtml(c)}"> ${escapeHtml(c)}`;
+        ul.appendChild(label);
+      });
+      qDiv.appendChild(ul);
+      // store correct answer in data attribute (not visible to user)
+      qDiv.dataset.correct = q.answer;
+      quizDiv.appendChild(qDiv);
+    });
+
+    submitBtn.onclick = () => gradeQuiz(questions.length);
+  }
+
+  function gradeQuiz(total){
+    let score = 0;
+    const qDivs = document.querySelectorAll('.question');
+    qDivs.forEach((div, i) => {
+      const correct = div.dataset.correct;
+      const selected = div.querySelector('input[type=radio]:checked');
+      if (selected && selected.value === correct) score++;
+    });
+    scoreDiv.textContent = `You scored ${score} / ${total}  (${Math.round(score/total*100)}%)`;
+    // Optionally reveal correct answers
+    qDivs.forEach((div) => {
+      const correct = div.dataset.correct;
+      const labels = div.querySelectorAll('label');
+      labels.forEach(l => {
+        const input = l.querySelector('input');
+        if (input.value === correct) l.classList.add('correct');
+        if (input.checked && input.value !== correct) l.classList.add('incorrect');
+      });
+    });
+  }
+
+  // small helper
+  function escapeHtml(str) {
+    return String(str)
+      .replaceAll('&','&amp;')
+      .replaceAll('<','&lt;')
+      .replaceAll('>','&gt;')
+      .replaceAll('"','&quot;')
+      .replaceAll("'",'&#039;');
+  }
+
+  // init
+  window.addEventListener('load', () => {
+    loadTopics();
+    startBtn.addEventListener('click', startQuiz);
+  });
+</script>
+</body>
+</html>
