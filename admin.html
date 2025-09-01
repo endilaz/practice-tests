@@ -73,6 +73,7 @@
   signinBtn.addEventListener('click', async () => {
     const email = emailInput.value;
     const password = passInput.value;
+    alert("TRYING TO SIGN IN " + email + " and " + password);
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       authMsg.textContent = 'Sign in error: ' + error.message;
