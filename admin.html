@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Practice Test — Admin</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
+</head>
+<body>
+  <main class="container">
+    <h1>Admin Panel</h1>
+
+    <section id="auth">
+      <div id="authForms">
+        <h3>Sign In</h3>
+        <input id="email" type="email" placeholder="email" />
+        <input id="password" type="password" placeholder="password" />
+        <button id="signinBtn">Sign in</button>
+        <button id="signoutBtn" style="display:none;">Sign out</button>
+        <div id="authMsg"></div>
+      </div>
+    </section>
+
+    <section id="adminApp" style="display:none;">
+      <h3>Add question</h3>
+      <label>Topic <input id="topic" placeholder="e.g., math" /></label>
+      <label>Question <textarea id="question_text"></textarea></label>
+      <label>Choices (one per line) <textarea id="choices"></textarea></label>
+      <label>Correct answer (exactly as one choice) <input id="answer" /></label>
+      <button id="addQ">Add Question</button>
+      <div id="status"></div>
+    </section>
+
+    <footer>
+      <small><a href="index.html">Student view</a></small>
+    </footer>
+  </main>
+
+<script>
+  // CONFIG - replace
+  const SUPABASE_URL = "https://YOUR_SUPABASE_URL.supabase.co";
+  const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+
+  const supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const emailInput = document.getElementById('email');
+  const passInput = document.getElementById('password');
+  const signinBtn = document.getElementById('signinBtn');
+  const signoutBtn = document.getElementById('signoutBtn');
+  const authMsg = document.getElementById('authMsg');
+  const adminApp = document.getElementById('adminApp');
+  const addQ = document.getElementById('addQ');
+  const status = document.getElementById('status');
+
+  async function checkSession(){
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      authMsg.textContent = `Signed in as ${session.user.email}`;
+      signinBtn.style.display = 'none';
+      signoutBtn.style.display = 'inline-block';
+      adminApp.style.display = 'block';
+    } else {
+      authMsg.textContent = 'Not signed in';
+      signinBtn.style.display = 'inline-block';
+      signoutBtn.style.display = 'none';
+      adminApp.style.display = 'none';
+    }
+  }
+
+  window.addEventListener('load', checkSession);
+
+  signinBtn.addEventListener('click', async () => {
+    const email = emailInput.value;
+    const password = passInput.value;
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      authMsg.textContent = 'Sign in error: ' + error.message;
+    } else {
+      authMsg.textContent = 'Signed in. Verifying admin access...';
+      await checkSession();
+    }
+  });
+
+  signoutBtn.addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    await checkSession();
+  });
+
+  addQ.addEventListener('click', async () => {
+    const topic = document.getElementById('topic').value.trim();
+    const question_text = document.getElementById('question_text').value.trim();
+    const choicesRaw = document.getElementById('choices').value.trim();
+    const answer = document.getElementById('answer').value.trim();
+
+    if (!topic || !question_text || !choicesRaw || !answer) {
+      status.textContent = 'Please fill all fields';
+      return;
+    }
+
+    const choices = choicesRaw.split('\n').map(c => c.trim()).filter(Boolean);
+    if (!choices.includes(answer)) {
+      status.textContent = 'Answer must match one of the choices exactly.';
+      return;
+    }
+
+    // Insert (RLS will allow only admins)
+    const { data, error } = await supabase
+      .from('questions')
+      .insert([{ topic, question_text, choices, answer }]);
+
+    if (error) {
+      status.textContent = 'Insert error: ' + error.message;
+    } else {
+      status.textContent = 'Question added!';
+      // clear fields
+      document.getElementById('topic').value='';
+      document.getElementById('question_text').value='';
+      document.getElementById('choices').value='';
+      document.getElementById('answer').value='';
+    }
+  });
+
+  // Optional: subscribe to auth changes
+  supabase.auth.onAuthStateChange((event, session) => {
+    checkSession();
+  });
+
+</script>
+</body>
+</html>
