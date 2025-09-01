@@ -35,7 +35,7 @@
   const SUPABASE_URL = "https://rfzlxatrzbszdqevvfyn.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmemx4YXRyemJzemRxZXZ2ZnluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY3NDcyMTIsImV4cCI6MjA3MjMyMzIxMn0.FGLdXM1unR9xwR3M06vPm7r7dW6c-y8urdJHUizrqT4";
 
-  const supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   // DOM
   const topicSelect = document.getElementById('topicSelect');
@@ -48,17 +48,20 @@
 
   // load distinct topics
   async function loadTopics() {
-    // fetch topics (distinct)
-    const { data, error } = await supabase
-      .rpc('get_distinct_topics') // we'll fallback if RPC not present
-      .catch(()=>null);
+    // // fetch topics (distinct)
+    // const { data, error } = await supabase.rpc('get_distinct_topics');
 
-    if (data && data.length) {
-      populateTopics(data.map(r=>r.topic));
-      return;
-    }
+    // if (error) {
+    //   console.error('RPC failed, falling back:', error.message);
+    //   data = []; // fallback
+    // }
 
-    // fallback: fetch all topics and dedupe client-side
+    // if (data && data.length) {
+    //   populateTopics(data.map(r=>r.topic));
+    //   return;
+    // }
+
+    // // fallback: fetch all topics and dedupe client-side
     const res = await supabase.from('questions').select('topic');
     if (res.error) {
       topicSelect.innerHTML = `<option>Error loading topics</option>`;

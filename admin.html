@@ -5,7 +5,7 @@
   <title>Practice Test — Admin</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link rel="stylesheet" href="style.css" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.56.1/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <main class="container">
@@ -42,7 +42,7 @@
   const SUPABASE_URL = "https://rfzlxatrzbszdqevvfyn.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmemx4YXRyemJzemRxZXZ2ZnluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY3NDcyMTIsImV4cCI6MjA3MjMyMzIxMn0.FGLdXM1unR9xwR3M06vPm7r7dW6c-y8urdJHUizrqT4";
 
-  const supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   const emailInput = document.getElementById('email');
   const passInput = document.getElementById('password');
@@ -74,7 +74,7 @@
     signinBtn.style.backgroundColor = 'green';
     const email = emailInput.value;
     const password = passInput.value;
-    alert("TRYING TO SIGN IN " + email + " and " + password);
+
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       authMsg.textContent = 'Sign in error: ' + error.message;
