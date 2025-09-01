@@ -71,6 +71,7 @@
   window.addEventListener('load', checkSession);
 
   signinBtn.addEventListener('click', async () => {
+    signinBtn.style.backgroundColor = 'green';
     const email = emailInput.value;
     const password = passInput.value;
     alert("TRYING TO SIGN IN " + email + " and " + password);
