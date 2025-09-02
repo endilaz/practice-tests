@@ -48,20 +48,6 @@
 
   // load distinct topics
   async function loadTopics() {
-    // // fetch topics (distinct)
-    // const { data, error } = await supabase.rpc('get_distinct_topics');
-
-    // if (error) {
-    //   console.error('RPC failed, falling back:', error.message);
-    //   data = []; // fallback
-    // }
-
-    // if (data && data.length) {
-    //   populateTopics(data.map(r=>r.topic));
-    //   return;
-    // }
-
-    // // fallback: fetch all topics and dedupe client-side
     const res = await supabase.from('questions').select('topic');
     if (res.error) {
       topicSelect.innerHTML = `<option>Error loading topics</option>`;
@@ -151,6 +137,10 @@
     qDivs.forEach((div, i) => {
       const correct = div.dataset.correct;
       const selected = div.querySelector('input[type=radio]:checked');
+      var inputs = document.querySelectorAll('input[type="radio"]');
+      for (var i = 0; i < inputs.length; i++) {
+        inputs[i].disabled = 'true';
+      }
       if (selected && selected.value === correct) score++;
     });
     scoreDiv.textContent = `You scored ${score} / ${total}  (${Math.round(score/total*100)}%)`;
