@@ -78,6 +78,8 @@
   }
 
   async function startQuiz(){
+    const controls = document.getElementById('controls');
+    controls.classList.add('hidden');
     const topic = topicSelect.value;
     const n = Math.max(1, Math.min(50, parseInt(numQ.value || 5)));
 
@@ -108,6 +110,7 @@
     questions.forEach((q, i) => {
       const qDiv = document.createElement('div');
       qDiv.className = 'question';
+      qDiv.id = `question${i}`;
       qDiv.innerHTML = `<p class="qtext">${i+1}. ${escapeHtml(q.question_text)}</p>`;
       const ul = document.createElement('div');
       ul.className = 'choices';
@@ -124,16 +127,22 @@
       });
       qDiv.appendChild(ul);
       // store correct answer in data attribute (not visible to user)
-      qDiv.dataset.correct = q.answer;
+      qDiv.dataset.correct = "haha no cheating";
       quizDiv.appendChild(qDiv);
     });
 
-    submitBtn.onclick = () => gradeQuiz(questions.length);
+    submitBtn.onclick = () => gradeQuiz(questions.length, questions);
   }
 
-  function gradeQuiz(total){
+  function gradeQuiz(total, chosen_questions){
     let score = 0;
     const qDivs = document.querySelectorAll('.question');
+    chosen_questions.forEach((q, i) => {
+      qDiv = document.getElementById(`question${i}`);
+      console.log(qDiv);
+      alert("testing");
+      qDiv.dataset.correct = q.answer;
+    });
     qDivs.forEach((div, i) => {
       const correct = div.dataset.correct;
       const selected = div.querySelector('input[type=radio]:checked');
@@ -154,6 +163,8 @@
         if (input.checked && input.value !== correct) l.classList.add('incorrect');
       });
     });
+    const controls = document.getElementById('controls');
+    controls.classList.remove('hidden');
   }
 
   // small helper
