@@ -24,16 +24,12 @@
       <button id="submitBtn">Submit</button>
       <div id="score" style="margin-top:1rem;"></div>
     </section>
-
-    <footer>
-      <small>Admin? <a href="admin.html">Open admin panel</a></small>
-    </footer>
   </main>
 
 <script>
   // CONFIG - replace with your project's values
   const SUPABASE_URL = "https://rfzlxatrzbszdqevvfyn.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmemx4YXRyemJzemRxZXZ2ZnluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY3NDcyMTIsImV4cCI6MjA3MjMyMzIxMn0.FGLdXM1unR9xwR3M06vPm7r7dW6c-y8urdJHUizrqT4";
+  const SUPABASE_ANON_KEY = "sb_publishable_JjhgUHkQJvWr7mkhiVNBmg_s5S2JJdB";
 
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -140,7 +136,6 @@
     chosen_questions.forEach((q, i) => {
       qDiv = document.getElementById(`question${i}`);
       console.log(qDiv);
-      alert("testing");
       qDiv.dataset.correct = q.answer;
     });
     qDivs.forEach((div, i) => {
