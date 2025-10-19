@@ -35,6 +35,24 @@ def scrape(url: str):
         print("-" * 50)
         print(raw_text[-500:])
         # raw_text is now ready for parsing
+        state = 0 # 0 = nothing, 1 = reading question text, 2 = reading answer choice, 3 = reading correct answer
+        for c in range(raw_text):
+            if raw_text[c].isdecimal(): 
+                if c + 1 < len(raw_text) and raw_text[c + 1] == ')':
+                    # start of question or answer number
+                    dig_start = c
+                    while raw_text[dig_start-1].isdecimal():
+                        dig_start -= 1
+                    question_number = int(raw_text[dig_start:c+1])
+                    state = 1
+                else:
+                    # included in text or not final digit in question/answer number
+                    pass
+            if raw_text[c:c+2] in "A)B)C)D)":
+                # start of answer choice
+                
+                pass
+
         lines = raw_text.split('\n')
         current_question = 0
         answers_started = False
