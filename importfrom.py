@@ -85,7 +85,7 @@ def parse_qa_block(qa_block: str, answer_key: Dict[int, str]) -> List[Dict]:
     # 6. D\)\s*(.*?)     -> Option D Text (Group 6, non-greedy up to next question num or end)
     # re.DOTALL makes '.' match newlines, crucial for dense text.
     QA_PATTERN = re.compile(
-        r'(\d+)\s*\)\s*(.*?)\s*'  # 1) Q_Num | Q_Text
+        r'(\d+)\s*\)\s*(.*?)\s*'  # 1) Q_Num | Q_Text (Raw content to be cleaned)
         r'A\)\s*(.*?)\s*'          # A) Option A
         r'B\)\s*(.*?)\s*'          # B) Option B
         r'C\)\s*(.*?)\s*'          # C) Option C
@@ -94,17 +94,36 @@ def parse_qa_block(qa_block: str, answer_key: Dict[int, str]) -> List[Dict]:
         re.DOTALL | re.IGNORECASE
     )
     
+    # Regex to find a URL, including the surrounding whitespace/newlines
+    # It looks for http:// or https:// and captures everything non-whitespace after it.
+    URL_PATTERN = re.compile(r'\s*(https?:\/\/[^\s]+)\s*', re.IGNORECASE)
+    
     all_questions = []
     
     # Iterate through all matches found in the QA block
     for match in QA_PATTERN.finditer(qa_block):
         q_num = int(match.group(1).strip())
+        raw_question_text = match.group(2).strip()
+        
+        # --- MEDIA URL EXTRACTION AND CLEANUP ---
+        media_url = None
+        
+        # Search for the URL pattern in the raw question text
+        url_match = URL_PATTERN.search(raw_question_text)
+        
+        if url_match:
+            # 1. Extract the URL (Group 1 of the URL_PATTERN)
+            media_url = url_match.group(1).strip()
+            
+            # 2. Remove the URL and surrounding whitespace from the text
+            cleaned_question_text = URL_PATTERN.sub('', raw_question_text).strip()
+        else:
+            cleaned_question_text = raw_question_text
         
         # --- ROBUST CLEANUP FOR OPTION D (THE END BLOCK) ---
         option_d_text = match.group(6).strip()
         
         # Pattern to remove large vertical whitespace blocks and key/footer text
-        # This targets multiple newlines/whitespace followed by any text (like a key/title)
         KEY_FOOTER_PATTERN = r'(\r?\n\s*){2,}.*Key|Answer\s*Key|Correct\s*Answers.*|2016\s+SLC\s+Business.*'
         
         # 1. Remove the key/footer text using the aggressive pattern
@@ -113,15 +132,36 @@ def parse_qa_block(qa_block: str, answer_key: Dict[int, str]) -> List[Dict]:
         # 2. Finally, replace any remaining embedded newlines or excessive internal spaces with a single space
         cleaned_option_d = re.sub(r'\s+', ' ', cleaned_option_d).strip()
         
+        # --- NEW LOGIC FOR OPTIONS ARRAY AND CORRECT ANSWER TEXT ---
+        
+        # 1. Collect all option texts into a dictionary for easy lookup
+        option_texts = {
+            'A': match.group(3).strip(),
+            'B': match.group(4).strip(),
+            'C': match.group(5).strip(),
+            'D': cleaned_option_d,
+        }
+
+        # 2. Get the correct letter (e.g., 'B') from the answer key
+        correct_letter = answer_key.get(q_num, 'Key Missing')
+        
+        # 3. Determine the correct answer text
+        correct_answer_text = option_texts.get(correct_letter, 'N/A')
+        
         # Create the structured record
         record = {
             "question_number": q_num,
-            "question_text": match.group(2).strip(),
-            "option_A": match.group(3).strip(),
-            "option_B": match.group(4).strip(),
-            "option_C": match.group(5).strip(),
-            "option_D": cleaned_option_d,
-            "correct_answer": answer_key.get(q_num, 'Key Missing')
+            "question_text": cleaned_question_text,
+            "media_url": media_url,
+            # Store all option texts in an array/list
+            "options": [
+                option_texts['A'],
+                option_texts['B'],
+                option_texts['C'],
+                option_texts['D']
+            ],
+            # Store the full text of the correct answer
+            "correct_answer": correct_answer_text
         }
         all_questions.append(record)
         
@@ -130,24 +170,6 @@ def parse_qa_block(qa_block: str, answer_key: Dict[int, str]) -> List[Dict]:
 
 def scrape_and_structure(raw_text: str) -> List[Dict]:
     """Splits the text into QA block and Key block, then parses both."""
-    
-    # Step 1: Find the split point (where the answer key likely begins)
-    # We look for the first instance of a key-like pattern (e.g., 10) A)
-    # If the text is dense, the split is difficult. We assume the Key starts 
-    # after the last question block, possibly marked by "Correct Answers" or similar
-    # text, which must be handled in the regex cleanup.
-    
-    # A simple split is to find the first occurrence of a number followed by a closing 
-    # parenthesis and a single letter, which is common in key sections.
-    # However, since the QA block also uses num), we look for a high Q number like 
-    # Q90 to signal the end of the Q/A section, or rely on explicit key wording.
-    
-    # Best effort: Find the last Q/A record using the loop in parse_qa_block, and 
-    # remove the content matched so far from the start of the text.
-    
-    # For robust parsing, we'll try to split the text block only once to get the key.
-    # The key is likely after the last question. Let's assume the question list 
-    # ends at or before Q100 and the Key starts immediately after, or at a heading.
     
     # Find the start of the key section using an assumption about its header.
     key_header_match = re.search(r'(Correct\s*Answers|Answer\s*Key)', raw_text, re.IGNORECASE)
@@ -180,7 +202,6 @@ def scrape_and_structure(raw_text: str) -> List[Dict]:
 # --- 4. SUPABASE IMPORT ---
 """
 def insert_into_supabase(records: List[Dict], table_name: str):
-    \"""Connects to Supabase and bulk inserts the records.\"""
     if not records:
         print("No records to insert. Exiting.")
         return
@@ -202,8 +223,8 @@ def insert_into_supabase(records: List[Dict], table_name: str):
     except Exception as e:
         print(f"\n❌ Supabase insertion error. Check your URL, Key, and Table Name.")
         print(f"Error details: {e}")
-        print("\nNote: Ensure your Supabase table has the following columns (all of type TEXT/VARCHAR or INTEGER for Q#):\n"
-              "  - question_number\n  - question_text\n  - option_A\n  - option_B\n  - option_C\n  - option_D\n  - correct_answer")
+        print("\nNote: Ensure your Supabase table has the following columns:\n"
+              "  - question_number (Integer)\n  - question_text (Text)\n  - media_url (Text/Varchar)\n  - options (JSONB or Text/Varchar array)\n  - correct_answer (Text)")
 """
 
 if __name__ == '__main__':
@@ -215,9 +236,11 @@ if __name__ == '__main__':
         
         if final_data:
             print("\n" + "=" * 60)
-            print("SAMPLE STRUCTURED DATA (last Question):")
+            print("SAMPLE STRUCTURED DATA (Check for media_url):")
             print("=" * 60)
-            print(json.dumps(final_data[-20:], indent=4))
+            # Find and print the first record with a media URL, or just the first record
+            sample_record = next((item for item in final_data if item.get('media_url')), final_data[0])
+            print(json.dumps(sample_record, indent=4))
             
             print("\n" + "=" * 60)
             print(f"Total Records Ready: {len(final_data)}")
