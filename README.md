@@ -8,14 +8,13 @@
 - [ ] use a random seed to generate each test
 - [ ] add option to retake test
 - [ ] add option to export test
-- [ ] add way to import test questions as csv
 - [ ] add tracking sessions, every time a test is taken gets added to database keeping track of (uid, when it was taken, total time taken, score, responses)
 - [ ] make the inputs not radio, more like actual button
 
 ## practice test input formats
-- question by question
-- 2016 slc google doc
-- fatskills (most of which are the 2016 docs??)
-- official competitive events study guides (2007, 2010, 2013, 2017)
-- mdfbla
-- LOOK AT THE DRIVE RAFA FOUND
+- [ ] question by question
+- [x] 2016 slc google doc
+- [ ] fatskills (most of which are the 2016 docs??)
+- [ ] official competitive events study guides (2007, 2010, 2013, 2017)
+- [ ] mdfbla
+- [ ] LOOK AT THE DRIVE RAFA FOUND

@@ -1,8 +1,9 @@
 import requests
+import argparse
 import re
 import json
 from typing import List, Dict, Optional
-# from supabase import create_client, Client # Install: pip install supabase
+from supabase import create_client, Client # Install: pip install supabase
 
 # --- 1. CONFIGURATION ---
 
@@ -10,11 +11,12 @@ from typing import List, Dict, Optional
 # https://docs.google.com/document/d/1p61dSCB8GuAKs067QFCTvR6V-BWTYFDJ/edit
 DOCUMENT_ID = '1nQqd3CHu510B1lSlXfcxyrbI10ZeaBj9' 
 EXPORT_URL = f'https://docs.google.com/document/d/{DOCUMENT_ID}/export?format=txt'
+TOPIC = "N/A"
 
 # Supabase Configuration (UPDATE THESE)
-# SUPABASE_URL = "YOUR_SUPABASE_URL"
-# SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY" # Use your Service Role key for production inserts
-# SUPABASE_TABLE_NAME = "quiz_questions" # The name of your Supabase table
+SUPABASE_URL = "https://rfzlxatrzbszdqevvfyn.supabase.co"
+SUPABASE_KEY = "sb_publishable_JjhgUHkQJvWr7mkhiVNBmg_s5S2JJdB" # Use your Service Role key for production inserts
+SUPABASE_TABLE_NAME = "questions" # The name of your Supabase table
 
 # --- 2. DATA FETCHING ---
 
@@ -76,17 +78,9 @@ def parse_qa_block(qa_block: str, answer_key: Dict[int, str]) -> List[Dict]:
     relying only on the 'X)' and 'A)' markers as boundaries.
     """
     
-    # This non-greedy regex attempts to capture the entire structure of one question:
-    # 1. (\d+)           -> Q_Num (Group 1)
-    # 2. (.*?)           -> Question Text (Group 2, non-greedy match up to A))
-    # 3. A\)\s*(.*?)     -> Option A Text (Group 3, non-greedy up to B))
-    # 4. B\)\s*(.*?)     -> Option B Text (Group 4, non-greedy up to C))
-    # 5. C\)\s*(.*?)     -> Option C Text (Group 5, non-greedy up to D))
-    # 6. D\)\s*(.*?)     -> Option D Text (Group 6, non-greedy up to next question num or end)
-    # re.DOTALL makes '.' match newlines, crucial for dense text.
     QA_PATTERN = re.compile(
-        r'(\d+)\s*\)\s*(.*?)\s*'  # 1) Q_Num | Q_Text (Raw content to be cleaned)
-        r'A\)\s*(.*?)\s*'          # A) Option A
+        r'(\d+)\s*\)\s*(.*?)\s*'   # 1) Q_Num | Q_Text (Raw content to be cleaned)
+        r'(?<![a-zA-Z])A\)\s*(.*?)\s*'          # A) Option A
         r'B\)\s*(.*?)\s*'          # B) Option B
         r'C\)\s*(.*?)\s*'          # C) Option C
         r'D\)\s*(.*?)'             # D) Option D
@@ -149,19 +143,23 @@ def parse_qa_block(qa_block: str, answer_key: Dict[int, str]) -> List[Dict]:
         correct_answer_text = option_texts.get(correct_letter, 'N/A')
         
         # Create the structured record
+        # Create the structured record
         record = {
-            "question_number": q_num,
+            # NEW: Column matching 'topic' from Supabase schema
+            "topic": TOPIC, 
+            # Existing: Column matching 'question_text'
             "question_text": cleaned_question_text,
+            # Existing: Column matching 'media_url'
             "media_url": media_url,
-            # Store all option texts in an array/list
-            "options": [
+            # RENAMED: 'options' changed to 'choices' (matches JSONB column)
+            "choices": [
                 option_texts['A'],
                 option_texts['B'],
                 option_texts['C'],
                 option_texts['D']
             ],
-            # Store the full text of the correct answer
-            "correct_answer": correct_answer_text
+            # RENAMED: 'correct_answer' changed to 'answer' (matches text column)
+            "answer": correct_answer_text
         }
         all_questions.append(record)
         
@@ -200,7 +198,7 @@ def scrape_and_structure(raw_text: str) -> List[Dict]:
     return structured_data
 
 # --- 4. SUPABASE IMPORT ---
-"""
+
 def insert_into_supabase(records: List[Dict], table_name: str):
     if not records:
         print("No records to insert. Exiting.")
@@ -223,12 +221,19 @@ def insert_into_supabase(records: List[Dict], table_name: str):
     except Exception as e:
         print(f"\n❌ Supabase insertion error. Check your URL, Key, and Table Name.")
         print(f"Error details: {e}")
-        print("\nNote: Ensure your Supabase table has the following columns:\n"
-              "  - question_number (Integer)\n  - question_text (Text)\n  - media_url (Text/Varchar)\n  - options (JSONB or Text/Varchar array)\n  - correct_answer (Text)")
-"""
+        
+parser = argparse.ArgumentParser(description='Import into Supabase from online source.')
+def get_input():
+    global TOPIC, EXPORT_URL, DOCUMENT_ID
+    parser.add_argument('topic', help='The name of the topic.')
+    parser.add_argument('-export_url', help='The URL of the document to import.')
+    parser.add_argument('-doc_id', help='The ID of the Google Docs to import.')
+    args = parser.parse_args()
+    TOPIC = args.topic
 
 if __name__ == '__main__':
     raw_text = fetch_document_text(EXPORT_URL)
+    get_input()
     
     if raw_text:
         # 1. Scrape and structure the data
@@ -239,7 +244,7 @@ if __name__ == '__main__':
             print("SAMPLE STRUCTURED DATA (Check for media_url):")
             print("=" * 60)
             # Find and print the first record with a media URL, or just the first record
-            sample_record = next((item for item in final_data if item.get('media_url')), final_data[0])
+            sample_record = next((item for item in final_data if "Hometown" in item.get('question_text')), final_data[0])
             print(json.dumps(sample_record, indent=4))
             
             print("\n" + "=" * 60)
@@ -247,6 +252,6 @@ if __name__ == '__main__':
             print("=" * 60)
             
             # 2. Insert into Supabase (UNCOMMENT THE LINE BELOW TO EXECUTE INSERTION)
-            # insert_into_supabase(final_data, SUPABASE_TABLE_NAME)
+            insert_into_supabase(final_data, SUPABASE_TABLE_NAME)
         else:
             print("Parsing failed to extract any structured questions.")

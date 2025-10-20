@@ -15,7 +15,7 @@
       <label for="topicSelect">Choose topic:</label>
       <select id="topicSelect"><option>Loading topics...</option></select>
       <label for="numQ">Number of questions:</label>
-      <input id="numQ" type="number" min="1" max="50" value="5" />
+      <input id="numQ" type="number" min="1" max="100" value="50" />
       <button id="startBtn">Start Quiz</button>
     </section>
 
@@ -77,7 +77,7 @@
     const controls = document.getElementById('controls');
     controls.classList.add('hidden');
     const topic = topicSelect.value;
-    const n = Math.max(1, Math.min(50, parseInt(numQ.value || 5)));
+    const n = Math.max(1, Math.min(100, parseInt(numQ.value || 5)));
 
     // get questions for topic
     const { data, error } = await supabase
