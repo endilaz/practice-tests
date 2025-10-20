@@ -2,6 +2,7 @@ import requests
 import argparse
 import re
 import json
+import zzz
 from typing import List, Dict, Optional
 from supabase import create_client, Client # Install: pip install supabase
 
@@ -14,8 +15,8 @@ EXPORT_URL = f'https://docs.google.com/document/d/{DOCUMENT_ID}/export?format=tx
 TOPIC = "N/A"
 
 # Supabase Configuration (UPDATE THESE)
-SUPABASE_URL = "https://rfzlxatrzbszdqevvfyn.supabase.co"
-SUPABASE_KEY = "sb_publishable_JjhgUHkQJvWr7mkhiVNBmg_s5S2JJdB" # Use your Service Role key for production inserts
+SUPABASE_URL = zzz.SUPABASE_URL
+SUPABASE_KEY = zzz.SUPABASE_KEY # Use your Service Role key for production inserts
 SUPABASE_TABLE_NAME = "questions" # The name of your Supabase table
 
 # --- 2. DATA FETCHING ---
@@ -230,10 +231,12 @@ def get_input():
     parser.add_argument('-doc_id', help='The ID of the Google Docs to import.')
     args = parser.parse_args()
     TOPIC = args.topic
+    if args.export_url:
+        EXPORT_URL = args.export_url
 
 if __name__ == '__main__':
-    raw_text = fetch_document_text(EXPORT_URL)
     get_input()
+    raw_text = fetch_document_text(EXPORT_URL)
     
     if raw_text:
         # 1. Scrape and structure the data
