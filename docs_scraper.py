@@ -89,10 +89,16 @@ def parse_qa_block(qa_block: str, answer_key: Dict[int, str], topic: str) -> Lis
     
     URL_PATTERN = re.compile(r'\s*(https?:\/\/[^\s]+)\s*', re.IGNORECASE)
     all_questions = []
+    bad_questions = [] # TODO: this doesn't get used anywhere yet
     
     for match in QA_PATTERN.finditer(qa_block):
         q_num = int(match.group(1).strip())
         raw_question_text = match.group(2).strip()
+
+        if "\r" in raw_question_text:
+            print(f"Parsing error found in question {q_num}: {raw_question_text}. Skipping...")
+            bad_questions.append(q_num)
+            continue
         
         # --- MEDIA URL EXTRACTION AND CLEANUP ---
         media_url = None
@@ -135,7 +141,8 @@ def parse_qa_block(qa_block: str, answer_key: Dict[int, str], topic: str) -> Lis
             "answer": correct_answer_text
         }
         all_questions.append(record)
-        
+    with open("bad_questions.txt", 'a') as f:
+        f.write(bad_questions)
     return all_questions
 
 # --- MODIFIED FUNCTION SIGNATURE TO ACCEPT TOPIC ---
