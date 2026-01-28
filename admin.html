@@ -42,7 +42,7 @@
   const SUPABASE_URL = "https://rfzlxatrzbszdqevvfyn.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_JjhgUHkQJvWr7mkhiVNBmg_s5S2JJdB";
 
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   const emailInput = document.getElementById('email');
   const passInput = document.getElementById('password');
