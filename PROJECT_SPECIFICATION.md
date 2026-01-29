@@ -345,33 +345,109 @@ function ProtectedRoute({ allowedRoles }) {
 
 **Submit:** Calls `generate_test()`, navigates to test start page
 
-### 6.4 Test Taking Interface
+### 6.4 Test Taking Interface - Complete UI Specification
 
-**Components:**
-- Header: Topic, progress, timer, submit button
-- Question: Number, text, image (if any)
-- Choices: Full-width buttons (A-D) with states:
-  - Default, hover, selected, eliminated
-- Controls: Mark for review, report issue, prev/next
-- Palette: Grid of question numbers, color-coded
+#### UI Design (Based on Mockup)
 
-**Features:**
-- Answer selection
-- Choice elimination (strikethrough)
-- Mark for review (flag)
-- Navigation (prev/next, palette)
+**Color Scheme:**
+- Background: Blue (CSS variable for easy theming)
+- Question cards: White with shadow
+- Text: Black on white, white on blue
+- Flexible styling - exact colors configurable
+
+**Overall Layout:**
+```
+Header: [Topic] [Timer] [View ▼] [Submit]
+Content: White question cards on blue background
+Footer: Question palette (always visible)
+```
+
+#### View Modes (Header Dropdown)
+
+**Three modes:**
+1. **All Questions** - Vertical scroll, all questions visible
+2. **One at a Time** - Single question, prev/next buttons
+3. **Review Only** - Only marked questions (or message if none)
+
+**Behavior:**
+- Switching preserves current position
+- Review mode: Prev/next navigate only marked questions
+
+#### Header (Spread Layout)
+
+```
+[Topic: Accounting]     [Timer: 24:35] [View ▼]     [Submit Test]
+```
+- Fixed height with room for future additions
+- Timer changes color when low (<5min yellow, <1min red)
+- View dropdown: Select between three modes
+
+#### Question Card
+
+**Structure:**
+- Progress: "Q5 - Question 5 of 25" (in card, not header)
+- Question text (with optional image)
+- Four answer choice rows (A, B, C, D)
+- Controls: Mark for Review checkbox
+- Report Issue button (top-right corner)
+
+**Answer Choice States:**
+- Default: White, gray border
+- Hover: Light blue tint
+- Selected: Blue background, white text
+- Eliminated: Light red/gray, strikethrough, NOT selectable
+
+**Important Rule:** Elimination prevents selection. If you eliminate a selected answer, it unselects first.
+
+#### Mark for Review vs Report Issue
+
+**Two separate features:**
+- **Mark for Review**: Checkbox at bottom, flags for revisit, shows in Review Only mode
+- **Report Issue**: Button in header, opens modal for feedback (difficulty/quality ratings + text)
+
+#### Question Palette
+
+**Always visible at bottom (all modes)**
+- Grid of numbered buttons (1, 2, 3... 25)
+- Color codes:
+  - Gray: Unanswered
+  - Green: Answered
+  - Yellow: Marked for review  
+  - Blue border: Current question
+- Click to navigate/scroll to question
+
+#### Navigation
+
+**Previous/Next Buttons:**
+- Visible in: "One at a Time" and "Review Only" modes
+- Hidden in: "All Questions" mode (use scroll)
+- In Review mode: Navigate only through marked questions
+
+#### Features
+
+- Answer selection (single choice)
+- Choice elimination (strikethrough, prevents selection)
+- Mark for review (checkbox)
+- Report issue (modal with feedback form)
+- View switching (dropdown preserves position)
 - Tab tracking (count switches)
-- Auto-save (every 30 sec)
+- Auto-save every 30 seconds
+- Timer with visual warnings
 
-**State Management:**
+#### State Management
+
 ```typescript
 interface TestState {
   attemptId: number;
   questions: Question[];
+  viewMode: 'all' | 'one' | 'review';
   currentIndex: number;
-  responses: Map<questionId, Response>;
+  responses: Map<number, Response>;
+  markedForReview: Set<number>;
+  eliminatedChoices: Map<number, number[]>; // questionId -> choiceIds
   timeElapsed: number;
   outOfBrowserSeconds: number;
+  tabSwitches: Map<number, number>;
 }
 ```
 
