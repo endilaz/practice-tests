@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useNavigate } from 'react-router-dom'
-import { testConfigSchema } from './testConfigSchema'
+import { testConfigSchema } from './test.schema'
 
 type Topic = {
   id: string
@@ -10,12 +10,22 @@ type Topic = {
 
 export function TestConfigForm() {
   const [topics, setTopics] = useState<Topic[]>([])
+  // Numeric fields are stored as strings so the user can clear them
+  // and type freely. Validation happens on submit via the Zod schema,
+  // not on every keystroke. Storing as number and using `|| 1` as a
+  // fallback silently snaps 0 and empty-string to 1, which prevents
+  // the user from seeing intermediate states while typing.
   const [topicId, setTopicId] = useState('')
-  const [questionCount, setQuestionCount] = useState(25)
+  const [questionCount, setQuestionCount] = useState('25')
   const [useTimer, setUseTimer] = useState(false)
-  const [minutes, setMinutes] = useState(30)
+  const [minutes, setMinutes] = useState('30')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  // Prevents duplicate submissions. Currently submit() only calls
+  // navigate() which is idempotent, but this pattern is established
+  // now so that when Feature 5 wires this to the generate_test() RPC
+  // the guard is already in place.
+  const [submitting, setSubmitting] = useState(false)
 
   const navigate = useNavigate()
 
@@ -38,28 +48,38 @@ export function TestConfigForm() {
   }
 
   function submit() {
+    if (submitting) return
     setError(null)
 
     const parsed = testConfigSchema.safeParse({
       topicId,
-      questionCount,
+      questionCount: Number(questionCount),
       useTimer,
-      minutes: useTimer ? minutes : undefined
+      minutes: useTimer ? Number(minutes) : undefined,
     })
 
     if (!parsed.success) {
-      setError('Invalid test configuration.')
+      // Surface the first validation error specifically rather than
+      // a generic message. Tells the user exactly what to fix.
+      const first = parsed.error.issues[0]
+      setError(first?.message ?? 'Invalid test configuration.')
       return
     }
 
+    setSubmitting(true)
+
     const params = new URLSearchParams({
-      topic: topicId,
-      count: String(questionCount),
-      timer: useTimer ? '1' : '0',
-      minutes: useTimer ? String(minutes) : '0'
+      topic: parsed.data.topicId,
+      count: String(parsed.data.questionCount),
+      timer: parsed.data.useTimer ? '1' : '0',
+      minutes: parsed.data.useTimer ? String(parsed.data.minutes) : '0',
     })
 
     navigate(`/test?${params.toString()}`)
+    // Note: submitting is not reset here because navigation unmounts
+    // this component. If navigation fails for any reason, the button
+    // stays disabled — which is the correct behavior (don't retry
+    // automatically, let the user refresh).
   }
 
   if (loading) return <p>Loading topics...</p>
@@ -97,7 +117,7 @@ export function TestConfigForm() {
           max={100}
           value={questionCount}
           onChange={e => {
-            setQuestionCount(Number(e.target.value) || 1)
+            setQuestionCount(e.target.value)
             setError(null)
           }}
           className="border px-2 py-1 w-full"
@@ -125,7 +145,7 @@ export function TestConfigForm() {
           min={1}
           max={180}
           value={minutes}
-          onChange={e => setMinutes(Number(e.target.value) || 1)}
+          onChange={e => setMinutes(e.target.value)}
           disabled={!useTimer}
           className="border px-2 py-1 w-full disabled:bg-gray-100"
         />
@@ -133,9 +153,10 @@ export function TestConfigForm() {
 
       <button
         onClick={submit}
-        className="bg-blue-600 text-white px-4 py-2 w-full"
+        disabled={submitting}
+        className="bg-blue-600 text-white px-4 py-2 w-full disabled:opacity-50"
       >
-        Start Test
+        {submitting ? 'Starting...' : 'Start Test'}
       </button>
     </div>
   )

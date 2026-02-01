@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
 type Topic = {
@@ -12,6 +12,10 @@ export function TopicsAdmin() {
   const [loading, setLoading] = useState(true)
   const [mutating, setMutating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Tracks the committed (server-confirmed) name for each topic so that
+  // onBlur can compare against it. If the value hasn't changed, no
+  // network request is sent.
+  const committedNames = useRef<Record<string, string>>({})
 
   useEffect(() => {
     loadTopics()
@@ -34,6 +38,12 @@ export function TopicsAdmin() {
       )
     } else {
       setTopics(data)
+      // Snapshot the names that came from the server.
+      const committed: Record<string, string> = {}
+      for (const t of data) {
+        committed[t.id] = t.name
+      }
+      committedNames.current = committed
     }
 
     setLoading(false)
@@ -56,6 +66,7 @@ export function TopicsAdmin() {
       setError(error.message)
     } else {
       setTopics(prev => [...prev, data])
+      committedNames.current[data.id] = data.name
       setNewTopic('')
     }
 
@@ -64,7 +75,19 @@ export function TopicsAdmin() {
 
   async function renameTopic(id: string, name: string) {
     const trimmed = name.trim()
-    if (!trimmed || mutating) return
+
+    // If the input is empty after trimming, revert to the last committed
+    // name rather than sending an empty string to the server.
+    if (!trimmed) {
+      setTopics(prev =>
+        prev.map(t => (t.id === id ? { ...t, name: committedNames.current[id] } : t))
+      )
+      return
+    }
+
+    // No change — skip the network request entirely.
+    if (trimmed === committedNames.current[id]) return
+    if (mutating) return
 
     setMutating(true)
     setError(null)
@@ -75,8 +98,14 @@ export function TopicsAdmin() {
       .eq('id', id)
 
     if (error) {
+      // Revert local state to the last known-good value on failure.
+      setTopics(prev =>
+        prev.map(t => (t.id === id ? { ...t, name: committedNames.current[id] } : t))
+      )
       setError(error.message)
     } else {
+      // Update committed snapshot to match what the server now has.
+      committedNames.current[id] = trimmed
       setTopics(prev =>
         prev.map(t => (t.id === id ? { ...t, name: trimmed } : t))
       )
@@ -100,6 +129,7 @@ export function TopicsAdmin() {
       setError(error.message)
     } else {
       setTopics(prev => prev.filter(t => t.id !== id))
+      delete committedNames.current[id]
     }
 
     setMutating(false)
