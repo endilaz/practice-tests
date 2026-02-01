@@ -4,3 +4,5 @@ credentials.*
 token.json
 *.txt
 token.*
+__pycache__/*
+*.pyc
