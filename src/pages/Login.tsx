@@ -11,6 +11,12 @@ export default function Login() {
   async function handleSubmit() {
     if (loading) return
     setError(null)
+
+    if (!email.trim() || !password.trim()) {
+      setError('Email and password are required.')
+      return
+    }
+
     setLoading(true)
 
     const { error } = await supabase.auth.signInWithPassword({ email, password })

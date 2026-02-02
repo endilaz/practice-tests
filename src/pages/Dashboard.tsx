@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { TestConfigForm } from '@/tests/TestConfig'
 import { useAuth } from '@/auth/useAuth'
 import { supabase } from '@/lib/supabase'
@@ -11,9 +12,9 @@ export default function Dashboard() {
         <h1 className="text-lg font-semibold">FBLA Practice Tests</h1>
         <div className="flex items-center gap-4">
           {role === 'admin' && (
-            <a href="/admin" className="text-sm text-blue-600 underline">
+            <Link to="/admin" className="text-sm text-blue-600 underline">
               Admin
-            </a>
+            </Link>
           )}
           <button
             onClick={() => supabase.auth.signOut()}

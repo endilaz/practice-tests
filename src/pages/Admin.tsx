@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { TopicsAdmin } from '@/topics/TopicsAdmin'
 
 export default function Admin() {
@@ -5,9 +6,9 @@ export default function Admin() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow px-4 py-3 flex justify-between items-center">
         <h1 className="text-lg font-semibold">Admin Panel</h1>
-        <a href="/" className="text-sm text-blue-600 underline">
+        <Link to="/" className="text-sm text-blue-600 underline">
           Back to Dashboard
-        </a>
+        </Link>
       </header>
 
       <main className="max-w-lg mx-auto mt-10 px-4">

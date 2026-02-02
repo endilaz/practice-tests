@@ -741,6 +741,7 @@ interface TestState {
 
 ## 9. Development Rules
 
+- **SEARCH FOR POTENTIAL BUGS AND SECURITY VULNERABILITIES** in all the code you write. I expect you to automatically find these flaws immediately after producing code, don't wait for a prompt to do this
 1. **Quality over quantity**: Robust, maintainable code prioritized over feature volume
 2. **No assumptions**: Always ask for clarification if anything is unclear
 3. **Focus on maintainability**: Clear, documented, modular code structure
@@ -748,7 +749,6 @@ interface TestState {
 5. **Flexibility**: Use CSS variables and configurable constants for easy customization
 - **Incremental development** - build and test each feature before moving to next
 - **Ask for confirmation** before proceeding with major changes
-- **Search for potential bugs** before committing code
 - **Write clear, maintainable code** with comments where needed
 1. **Never trust the frontend for security.** RLS is authoritative. The frontend must never assume a role or skip a check that the database doesn't also enforce.
 2. **Role comes from the database, never from the JWT.** `AuthProvider` fetches role via a query to `public.users`. This is already implemented — do not change this pattern.

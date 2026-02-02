@@ -14,6 +14,11 @@ export default function Register() {
     if (loading) return
     setError(null)
 
+    if (!email.trim() || !password.trim()) {
+      setError('Email and password are required.')
+      return
+    }
+
     if (password !== confirm) {
       setError('Passwords do not match.')
       return
