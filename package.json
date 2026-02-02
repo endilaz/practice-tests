@@ -1,21 +1,12 @@
 {
   "name": "practice_tests",
   "version": "1.0.0",
-  "description": "first time kinda nervous",
-  "homepage": "https://github.com/endilaz/practice-tests#readme",
-  "bugs": {
-    "url": "https://github.com/endilaz/practice-tests/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/endilaz/practice-tests.git"
-  },
-  "license": "ISC",
-  "author": "",
-  "type": "commonjs",
-  "main": "index.js",
+  "private": true,
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.93.3",
