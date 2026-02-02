@@ -276,16 +276,3 @@ We have completed the comprehensive technical specification. Ready to begin Week
 - **Write clear, maintainable code** with comments where needed
 
 ---
-
-## How to Use This Prompt
-
-When starting a new conversation with an LLM, paste this entire prompt and then ask: "Do you understand the project context? Are there any clarifications needed before we proceed with [specific task]?"
-
-The LLM should be able to:
-- Understand the full project architecture
-- Know the database schema and relationships
-- Understand the UI design and interaction patterns
-- Implement features according to the specification
-- Make decisions consistent with the established patterns
-
-**Reference Document:** See `PROJECT_SPECIFICATION.md` for complete technical details.
