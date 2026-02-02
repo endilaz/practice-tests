@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 
 export default function Login() {
@@ -7,6 +7,7 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const navigate = useNavigate()
 
   async function handleSubmit() {
     if (loading) return
@@ -24,10 +25,12 @@ export default function Login() {
     if (error) {
       setError(error.message)
       setLoading(false)
+    } else {
+      // Success: navigate to dashboard. AuthProvider's onAuthStateChange
+      // will detect the new session and set user + role. By the time
+      // ProtectedRoute renders, loading will resolve and Dashboard appears.
+      navigate('/')
     }
-    // On success: don't manually navigate. AuthProvider detects the new
-    // session via onAuthStateChange, sets user + role, and ProtectedRoute
-    // on "/" will render Dashboard once loading resolves.
   }
 
   return (

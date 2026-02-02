@@ -1,7 +1,15 @@
 # FBLA Practice Tests — Developer Context
-
-Paste this file at the start of a new conversation to restore full project state.
-Everything below reflects the actual codebase as of the last sync. Do not assume anything not stated here.
+## 0. AI Guidelines 
+- **SEARCH FOR POTENTIAL BUGS AND SECURITY VULNERABILITIES** in all the code you write. I expect you to automatically find these flaws immediately after producing code, don't wait for a prompt to do this
+1. **Quality over quantity**: Robust, maintainable code prioritized over feature volume
+2. **No assumptions**: Always ask for clarification if anything is unclear
+3. **Focus on maintainability**: Clear, documented, modular code structure
+4. **Scalability**: Architecture supports growth without major refactoring
+5. **Flexibility**: Use CSS variables and configurable constants for easy customization
+- **Incremental development** - build and test each feature before moving to next
+- **Ask for confirmation** before proceeding with major changes
+- **Write clear, maintainable code** with comments where needed
+- **Do not reproduce code files when modifying them**, simply give a diff of the relevant lines
 
 ---
 
