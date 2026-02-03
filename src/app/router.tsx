@@ -4,6 +4,7 @@ import Login from '@/pages/Login'
 import Register from '@/pages/Register'
 import Dashboard from '@/pages/Dashboard'
 import Admin from '@/pages/Admin'
+import TestShell from '@/tests/TestShell'
 
 export const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
@@ -13,6 +14,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <Dashboard />
+      </ProtectedRoute>
+    )
+  },
+  {
+    path: '/test',
+    element: (
+      <ProtectedRoute>
+        <TestShell />
       </ProtectedRoute>
     )
   },
