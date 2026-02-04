@@ -18,7 +18,7 @@ export const router = createBrowserRouter([
     )
   },
   {
-    path: '/test',
+    path: '/test/:id',
     element: (
       <ProtectedRoute>
         <TestShell />

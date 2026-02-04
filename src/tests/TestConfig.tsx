@@ -10,21 +10,12 @@ type Topic = {
 
 export function TestConfigForm() {
   const [topics, setTopics] = useState<Topic[]>([])
-  // Numeric fields are stored as strings so the user can clear them
-  // and type freely. Validation happens on submit via the Zod schema,
-  // not on every keystroke. Storing as number and using `|| 1` as a
-  // fallback silently snaps 0 and empty-string to 1, which prevents
-  // the user from seeing intermediate states while typing.
   const [topicId, setTopicId] = useState('')
   const [questionCount, setQuestionCount] = useState('25')
   const [useTimer, setUseTimer] = useState(false)
   const [minutes, setMinutes] = useState('30')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  // Prevents duplicate submissions. Currently submit() only calls
-  // navigate() which is idempotent, but this pattern is established
-  // now so that when Feature 5 wires this to the generate_test() RPC
-  // the guard is already in place.
   const [submitting, setSubmitting] = useState(false)
 
   const navigate = useNavigate()
@@ -47,7 +38,7 @@ export function TestConfigForm() {
     setLoading(false)
   }
 
-  function submit() {
+  async function submit() {
     if (submitting) return
     setError(null)
 
@@ -59,8 +50,6 @@ export function TestConfigForm() {
     })
 
     if (!parsed.success) {
-      // Surface the first validation error specifically rather than
-      // a generic message. Tells the user exactly what to fix.
       const first = parsed.error.issues[0]
       setError(first?.message ?? 'Invalid test configuration.')
       return
@@ -68,18 +57,22 @@ export function TestConfigForm() {
 
     setSubmitting(true)
 
-    const params = new URLSearchParams({
-      topic: parsed.data.topicId,
-      count: String(parsed.data.questionCount),
-      timer: parsed.data.useTimer ? '1' : '0',
-      minutes: parsed.data.useTimer ? String(parsed.data.minutes) : '0',
+    // Generate the test ONCE here, then navigate with attemptId
+    const { data, error: rpcError } = await supabase.rpc('generate_test', {
+      p_topic_id: parsed.data.topicId,
+      p_question_count: parsed.data.questionCount,
+      p_use_timer: parsed.data.useTimer,
+      p_minutes: parsed.data.useTimer ? parsed.data.minutes : 0,
     })
 
-    navigate(`/test?${params.toString()}`)
-    // Note: submitting is not reset here because navigation unmounts
-    // this component. If navigation fails for any reason, the button
-    // stays disabled — which is the correct behavior (don't retry
-    // automatically, let the user refresh).
+    if (rpcError) {
+      setError(rpcError.message)
+      setSubmitting(false)
+      return
+    }
+
+    const attemptId = data as string
+    navigate(`/test/${attemptId}`)
   }
 
   if (loading) return <p>Loading topics...</p>

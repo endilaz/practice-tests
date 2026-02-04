@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
-import { useGenerateTest } from './useGenerateTest'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -181,9 +180,8 @@ function QuestionCard(props: QuestionCardProps) {
 // Component
 // ---------------------------------------------------------------------------
 export default function TestShell() {
-  const [searchParams] = useSearchParams()
+  const { id: attemptIdParam } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { generateTest, loading: generating, error: generateError } = useGenerateTest()
 
   // ── core data ──────────────────────────────────────────────────────────
   const [attemptId, setAttemptId] = useState<string | null>(null)
@@ -233,34 +231,17 @@ export default function TestShell() {
   responsesRef.current = responses
 
   // ---------------------------------------------------------------------------
-  // Generate test on mount
+  // Read attemptId from URL on mount
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    const topicId = searchParams.get('topic')
-    const count = searchParams.get('count')
-    const timerEnabled = searchParams.get('timer') === '1'
-    const minutes = searchParams.get('minutes')
-
-    if (!topicId || !count) {
-      setError('Invalid test configuration.')
+    if (!attemptIdParam) {
+      setError('No test attempt ID provided.')
       setLoading(false)
       return
     }
 
-    generateTest({
-      topicId,
-      questionCount: parseInt(count, 10),
-      useTimer: timerEnabled,
-      minutes: timerEnabled && minutes ? parseInt(minutes, 10) : 0,
-    }).then(id => {
-      if (id) {
-        setAttemptId(id)
-        if (timerEnabled && minutes) setTimeRemaining(parseInt(minutes, 10) * 60)
-      } else {
-        setLoading(false)
-      }
-    })
-  }, [searchParams])
+    setAttemptId(attemptIdParam)
+  }, [attemptIdParam])
 
   // ---------------------------------------------------------------------------
   // Load test data after generation
@@ -272,21 +253,29 @@ export default function TestShell() {
       setLoading(true)
       setError(null)
 
-      // 1. Set started_at only if not already set (safe on refresh)
-      const { data: attemptRow } = await supabase
+      // 1. Get attempt metadata (including timer settings)
+      const { data: attemptRow, error: attemptError } = await supabase
         .from('test_attempts')
-        .select('started_at')
+        .select('started_at, use_timer, minutes')
         .eq('id', attemptId)
         .single()
 
-      if (!attemptRow?.started_at) {
+      if (attemptError) { setError('Failed to load test.'); setLoading(false); return }
+
+      // 2. Set started_at only if not already set (safe on refresh)
+      if (!attemptRow.started_at) {
         await supabase
           .from('test_attempts')
           .update({ started_at: new Date().toISOString() })
           .eq('id', attemptId)
       }
 
-      // 2. Questions (ordered by position)
+      // 3. Set up timer if enabled
+      if (attemptRow.use_timer && attemptRow.minutes) {
+        setTimeRemaining(attemptRow.minutes * 60)
+      }
+
+      // 4. Questions (ordered by position)
       const { data: aqRows, error: aqErr } = await supabase
         .from('attempt_questions')
         .select('question_id, position, questions(id, question_text)')
@@ -295,7 +284,7 @@ export default function TestShell() {
 
       if (aqErr) { setError('Failed to load questions.'); setLoading(false); return }
 
-      // 3. Answer choices (bulk fetch for all questions)
+      // 5. Answer choices (bulk fetch for all questions)
       const qIds = aqRows.map((r: any) => r.question_id)
       const { data: choiceRows, error: chErr } = await supabase
         .from('answer_choices')
@@ -304,7 +293,7 @@ export default function TestShell() {
 
       if (chErr) { setError('Failed to load choices.'); setLoading(false); return }
 
-      // 4. Response rows — includes every field we need to hydrate
+      // 6. Response rows — includes every field we need to hydrate
       const { data: respRows, error: respErr } = await supabase
         .from('question_responses')
         .select(
@@ -315,7 +304,7 @@ export default function TestShell() {
 
       if (respErr) { setError('Failed to load responses.'); setLoading(false); return }
 
-      // 5. Commit state
+      // 7. Commit state
       setQuestions(aqRows.map((r: any) => ({
         id: r.questions.id,
         question_text: r.questions.question_text,
@@ -325,8 +314,10 @@ export default function TestShell() {
       setResponses(respRows as ResponseRow[])
       setLoading(false)
 
-      // 6. Start timer after everything is visible
-      if (timeRemaining !== null) setTimerActive(true)
+      // 8. Start timer after everything is visible
+      if (attemptRow.use_timer && attemptRow.minutes) {
+        setTimerActive(true)
+      }
     }
 
     loadTest()
@@ -636,22 +627,20 @@ export default function TestShell() {
   // ---------------------------------------------------------------------------
   // Early-return screens
   // ---------------------------------------------------------------------------
-  if (generating || loading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-lg text-gray-600">
-          {generating ? 'Generating test…' : 'Loading questions…'}
-        </p>
+        <p className="text-lg text-gray-600">Loading questions…</p>
       </div>
     )
   }
 
-  if (generateError || error) {
+  if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="bg-white p-8 rounded-xl shadow max-w-md">
           <h2 className="text-xl font-bold text-red-600 mb-4">Error</h2>
-          <p className="text-gray-700">{generateError || error}</p>
+          <p className="text-gray-700">{error}</p>
           <button type="button" onClick={() => navigate('/')} className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg">
             Back to Dashboard
           </button>
