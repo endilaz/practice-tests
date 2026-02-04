@@ -47,6 +47,137 @@ function orderChoices(row: ResponseRow | undefined, raw: AnswerChoice[]): Answer
 }
 
 // ---------------------------------------------------------------------------
+// Sub-components (defined outside to prevent re-creation on every render)
+// ---------------------------------------------------------------------------
+
+type QuestionCardProps = {
+  question: Question
+  responses: ResponseRow[]
+  choices: AnswerChoice[]
+  questions: Question[]
+  viewMode: ViewMode
+  currentIndex: number
+  selectAnswer: (questionId: string, choiceId: string) => void
+  toggleElimination: (questionId: string, choiceId: string) => void
+  toggleMarked: (questionId: string) => void
+  openReport: (questionId: string) => void
+  goTo: (index: number) => void
+  prevIndex: () => number
+  nextIndex: () => number
+}
+
+function QuestionCard(props: QuestionCardProps) {
+  const {
+    question, responses, choices, questions, viewMode, currentIndex,
+    selectAnswer, toggleElimination, toggleMarked, openReport, goTo,
+    prevIndex, nextIndex
+  } = props
+
+  const row = responses.find(r => r.question_id === question.id)
+  const ordered = orderChoices(row, choices.filter(c => c.question_id === question.id))
+  const qIdx = questions.findIndex(q => q.id === question.id)
+
+  return (
+    <div id={`q-${question.id}`} className="bg-white rounded-xl shadow-lg p-8 space-y-6">
+      {/* progress + report trigger */}
+      <div className="flex justify-between items-center">
+        <span className="text-sm text-gray-500">
+          Question {qIdx + 1} of {questions.length}
+        </span>
+        <button
+          type="button"
+          onClick={() => openReport(question.id)}
+          className="text-xs text-gray-500 border border-gray-300 px-2 py-1 rounded hover:bg-gray-100 transition-colors"
+        >
+          Report Issue
+        </button>
+      </div>
+
+      {/* question text */}
+      <h2 className="text-xl font-bold text-gray-900">{question.question_text}</h2>
+
+      {/* answer choices */}
+      <div className="space-y-3">
+        {ordered.map((choice, i) => {
+          const isEliminated = row?.eliminated_choices?.includes(choice.id) ?? false
+          const isSelected   = row?.selected_choice_id === choice.id
+
+          return (
+            <div key={choice.id} className="flex items-center gap-2">
+              {/* choice button */}
+              <button
+                type="button"
+                onClick={() => selectAnswer(question.id, choice.id)}
+                disabled={isEliminated}
+                className={[
+                  'flex-1 text-left px-4 py-3 rounded-lg border-2 transition-colors',
+                  isEliminated
+                    ? 'bg-red-50 border-red-200 text-red-400 line-through cursor-not-allowed'
+                    : isSelected
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-gray-900 border-gray-300 hover:bg-blue-50 hover:border-blue-300',
+                ].join(' ')}
+              >
+                <span className="font-semibold">{DISPLAY_LABELS[i]}.</span>{' '}
+                {choice.choice_text}
+              </button>
+
+              {/* elimination toggle */}
+              <button
+                type="button"
+                onClick={() => toggleElimination(question.id, choice.id)}
+                className={[
+                  'w-8 h-8 flex items-center justify-center rounded border text-sm transition-colors',
+                  isEliminated
+                    ? 'bg-red-100 border-red-300 text-red-600 hover:bg-red-200'
+                    : 'bg-gray-100 border-gray-300 text-gray-500 hover:bg-gray-200',
+                ].join(' ')}
+                title={isEliminated ? 'Un-eliminate' : 'Eliminate'}
+              >
+                ✕
+              </button>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* mark for review */}
+      <label className="flex items-center gap-2 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={row?.marked_for_review ?? false}
+          onChange={() => toggleMarked(question.id)}
+          className="w-4 h-4 accent-blue-600"
+        />
+        <span className="text-sm text-gray-700">Mark for review</span>
+      </label>
+
+      {/* prev / next — only in one-at-a-time and review modes */}
+      {viewMode !== 'all' && (
+        <div className="flex justify-between pt-3 border-t border-gray-200">
+          <button
+            type="button"
+            onClick={() => goTo(prevIndex())}
+            disabled={prevIndex() === currentIndex}
+            className="px-4 py-2 border rounded-lg text-sm disabled:opacity-30 hover:bg-gray-50 transition-colors"
+          >
+            Previous
+          </button>
+          <button
+            type="button"
+            onClick={() => goTo(nextIndex())}
+            disabled={nextIndex() === currentIndex}
+            className="px-4 py-2 border rounded-lg text-sm disabled:opacity-30 hover:bg-gray-50 transition-colors"
+          >
+            Next
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 export default function TestShell() {
@@ -495,108 +626,11 @@ export default function TestShell() {
     return 'bg-gray-200 text-gray-700'
   }
 
-  // ---------------------------------------------------------------------------
-  // Sub-render: one question card
-  // ---------------------------------------------------------------------------
-  function QuestionCard({ question }: { question: Question }) {
-    const row = responses.find(r => r.question_id === question.id)
-    const ordered = orderChoices(row, choices.filter(c => c.question_id === question.id))
-    const qIdx = questions.findIndex(q => q.id === question.id)
-
-    return (
-      <div id={`q-${question.id}`} className="bg-white rounded-xl shadow-lg p-8 space-y-6">
-        {/* progress + report trigger */}
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-500">
-            Question {qIdx + 1} of {questions.length}
-          </span>
-          <button
-            onClick={() => openReport(question.id)}
-            className="text-xs text-gray-500 border border-gray-300 px-2 py-1 rounded hover:bg-gray-100 transition-colors"
-          >
-            Report Issue
-          </button>
-        </div>
-
-        {/* question text */}
-        <h2 className="text-xl font-bold text-gray-900">{question.question_text}</h2>
-
-        {/* answer choices */}
-        <div className="space-y-3">
-          {ordered.map((choice, i) => {
-            const isEliminated = row?.eliminated_choices?.includes(choice.id) ?? false
-            const isSelected   = row?.selected_choice_id === choice.id
-
-            return (
-              <div key={choice.id} className="flex items-center gap-2">
-                {/* choice button */}
-                <button
-                  onClick={() => selectAnswer(question.id, choice.id)}
-                  disabled={isEliminated}
-                  className={[
-                    'flex-1 text-left px-4 py-3 rounded-lg border-2 transition-colors',
-                    isEliminated
-                      ? 'bg-red-50 border-red-200 text-red-400 line-through cursor-not-allowed'
-                      : isSelected
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white text-gray-900 border-gray-300 hover:bg-blue-50 hover:border-blue-300',
-                  ].join(' ')}
-                >
-                  {/* ← positional label, NOT choice.choice_letter */}
-                  <span className="font-semibold">{DISPLAY_LABELS[i]}.</span>{' '}
-                  {choice.choice_text}
-                </button>
-
-                {/* elimination toggle — small ✕ button beside each choice */}
-                <button
-                  onClick={() => toggleElimination(question.id, choice.id)}
-                  className={[
-                    'w-8 h-8 flex items-center justify-center rounded border text-sm transition-colors',
-                    isEliminated
-                      ? 'bg-red-100 border-red-300 text-red-600 hover:bg-red-200'
-                      : 'bg-gray-100 border-gray-300 text-gray-500 hover:bg-gray-200',
-                  ].join(' ')}
-                  title={isEliminated ? 'Un-eliminate' : 'Eliminate'}
-                >
-                  ✕
-                </button>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* mark for review */}
-        <label className="flex items-center gap-2 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={row?.marked_for_review ?? false}
-            onChange={() => toggleMarked(question.id)}
-            className="w-4 h-4 accent-blue-600"
-          />
-          <span className="text-sm text-gray-700">Mark for review</span>
-        </label>
-
-        {/* prev / next — only in one-at-a-time and review modes */}
-        {viewMode !== 'all' && (
-          <div className="flex justify-between pt-3 border-t border-gray-200">
-            <button
-              onClick={() => goTo(prevIndex())}
-              disabled={prevIndex() === currentIndex}
-              className="px-4 py-2 border rounded-lg text-sm disabled:opacity-30 hover:bg-gray-50 transition-colors"
-            >
-              Previous
-            </button>
-            <button
-              onClick={() => goTo(nextIndex())}
-              disabled={nextIndex() === currentIndex}
-              className="px-4 py-2 border rounded-lg text-sm disabled:opacity-30 hover:bg-gray-50 transition-colors"
-            >
-              Next
-            </button>
-          </div>
-        )}
-      </div>
-    )
+  // Props to pass to QuestionCard
+  const cardProps = {
+    responses, choices, questions, viewMode, currentIndex,
+    selectAnswer, toggleElimination, toggleMarked, openReport,
+    goTo, prevIndex, nextIndex
   }
 
   // ---------------------------------------------------------------------------
@@ -618,7 +652,7 @@ export default function TestShell() {
         <div className="bg-white p-8 rounded-xl shadow max-w-md">
           <h2 className="text-xl font-bold text-red-600 mb-4">Error</h2>
           <p className="text-gray-700">{generateError || error}</p>
-          <button onClick={() => navigate('/')} className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg">
+          <button type="button" onClick={() => navigate('/')} className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg">
             Back to Dashboard
           </button>
         </div>
@@ -635,7 +669,7 @@ export default function TestShell() {
           <p className="text-lg text-gray-600">
             {score.total > 0 ? Math.round((score.score / score.total) * 100) : 0}%
           </p>
-          <button onClick={() => navigate('/')} className="bg-blue-600 text-white px-6 py-2 rounded-lg">
+          <button type="button" onClick={() => navigate('/')} className="bg-blue-600 text-white px-6 py-2 rounded-lg">
             Back to Dashboard
           </button>
         </div>
@@ -684,6 +718,7 @@ export default function TestShell() {
 
           {/* submit */}
           <button
+            type="button"
             onClick={handleSubmit}
             disabled={submitting}
             className="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
@@ -697,16 +732,16 @@ export default function TestShell() {
       <main className="flex-1 overflow-y-auto p-6">
         <div className="max-w-2xl mx-auto space-y-6">
           {viewMode === 'one' && questions[currentIndex] && (
-            <QuestionCard question={questions[currentIndex]} />
+            <QuestionCard question={questions[currentIndex]} {...cardProps} />
           )}
 
           {viewMode === 'all' && questions.map(q => (
-            <QuestionCard key={q.id} question={q} />
+            <QuestionCard key={q.id} question={q} {...cardProps} />
           ))}
 
           {viewMode === 'review' && (
             anyMarked
-              ? <QuestionCard question={questions[currentIndex]} />
+              ? <QuestionCard question={questions[currentIndex]} {...cardProps} />
               : <div className="bg-white rounded-xl shadow-lg p-8 text-center space-y-2">
                   <p className="text-gray-700 font-medium">No questions marked for review.</p>
                   <p className="text-sm text-gray-400">
@@ -729,6 +764,7 @@ export default function TestShell() {
             return (
               <button
                 key={q.id}
+                type="button"
                 onClick={() => {
                   if (blocked) return
                   setCurrentIndex(i)
@@ -759,6 +795,7 @@ export default function TestShell() {
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-bold text-gray-900">Report an Issue</h3>
               <button
+                type="button"
                 onClick={() => setReportState(s => ({ ...s, questionId: null }))}
                 className="text-gray-400 hover:text-gray-700 text-xl leading-none"
               >✕</button>
@@ -773,6 +810,7 @@ export default function TestShell() {
                 {[1,2,3,4,5].map(n => (
                   <button
                     key={n}
+                    type="button"
                     onClick={() => setReportState(s => ({ ...s, difficulty: n }))}
                     className={[
                       'w-9 h-9 rounded-lg border text-sm font-semibold transition-colors',
@@ -792,6 +830,7 @@ export default function TestShell() {
                 {[1,2,3,4,5].map(n => (
                   <button
                     key={n}
+                    type="button"
                     onClick={() => setReportState(s => ({ ...s, quality: n }))}
                     className={[
                       'w-9 h-9 rounded-lg border text-sm font-semibold transition-colors',
@@ -819,10 +858,12 @@ export default function TestShell() {
             {/* actions */}
             <div className="flex justify-end gap-2 pt-1">
               <button
+                type="button"
                 onClick={() => setReportState(s => ({ ...s, questionId: null }))}
                 className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors"
               >Cancel</button>
               <button
+                type="button"
                 onClick={submitReport}
                 disabled={reportState.submitting}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50 transition-colors"
