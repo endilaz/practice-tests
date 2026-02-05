@@ -653,14 +653,27 @@ export default function TestShell() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="bg-white p-8 rounded-xl shadow max-w-md w-full text-center space-y-4">
-          <h2 className="text-2xl font-bold">Test Complete</h2>
+          <h2 className="text-2xl font-bold">Test Complete!</h2>
           <p className="text-5xl font-bold text-blue-600">{score.score} / {score.total}</p>
           <p className="text-lg text-gray-600">
             {score.total > 0 ? Math.round((score.score / score.total) * 100) : 0}%
           </p>
-          <button type="button" onClick={() => navigate('/')} className="bg-blue-600 text-white px-6 py-2 rounded-lg">
-            Back to Dashboard
-          </button>
+          <div className="flex flex-col gap-2 pt-4">
+            <button 
+              type="button" 
+              onClick={() => navigate(`/results/${attemptId}`)} 
+              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-medium"
+            >
+              View Detailed Results
+            </button>
+            <button 
+              type="button" 
+              onClick={() => navigate('/')} 
+              className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700"
+            >
+              Back to Dashboard
+            </button>
+          </div>
         </div>
       </div>
     )
