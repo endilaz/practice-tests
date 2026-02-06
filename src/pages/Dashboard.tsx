@@ -20,12 +20,13 @@ export default function Dashboard() {
   const [attempts, setAttempts] = useState<TestAttempt[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [historyLimit, setHistoryLimit] = useState(10)
 
   useEffect(() => {
     if (user) {
       loadTestHistory()
     }
-  }, [user])
+  }, [user, historyLimit])
 
   async function loadTestHistory() {
     if (!user) return
@@ -40,7 +41,7 @@ export default function Dashboard() {
         .eq('user_id', user.id)
         .not('completed_at', 'is', null)
         .order('completed_at', { ascending: false })
-        .limit(10)
+        .limit(historyLimit)
 
       if (fetchError) throw fetchError
 
@@ -104,7 +105,20 @@ export default function Dashboard() {
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold">Test History</h2>
             {attempts.length > 0 && (
-              <p className="text-sm text-gray-500">Showing last 10 tests</p>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600">Show:</label>
+                <select
+                  value={historyLimit}
+                  onChange={e => setHistoryLimit(Number(e.target.value))}
+                  className="border border-gray-300 rounded px-2 py-1 text-sm"
+                >
+                  <option value={5}>5 tests</option>
+                  <option value={10}>10 tests</option>
+                  <option value={20}>20 tests</option>
+                  <option value={50}>50 tests</option>
+                  <option value={100}>100 tests</option>
+                </select>
+              </div>
             )}
           </div>
           
