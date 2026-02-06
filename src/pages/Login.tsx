@@ -9,18 +9,25 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
 
-  async function handleSubmit() {
+  async function handleSubmit(e?: React.FormEvent) {
+    e?.preventDefault()
     if (loading) return
     setError(null)
 
-    if (!email.trim() || !password.trim()) {
+    const trimmedEmail = email.trim()
+    const trimmedPassword = password.trim()
+
+    if (!trimmedEmail || !trimmedPassword) {
       setError('Email and password are required.')
       return
     }
 
     setLoading(true)
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { error } = await supabase.auth.signInWithPassword({ 
+      email: trimmedEmail, 
+      password: trimmedPassword 
+    })
 
     if (error) {
       setError(error.message)
@@ -40,35 +47,39 @@ export default function Login() {
 
         {error && <p className="text-red-600 text-sm">{error}</p>}
 
-        <div>
-          <label className="block text-sm font-medium mb-1">Email</label>
-          <input
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={e => { setEmail(e.target.value); setError(null) }}
-            className="border px-2 py-1 w-full rounded"
-          />
-        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Email</label>
+            <input
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={e => { setEmail(e.target.value); setError(null) }}
+              className="border px-2 py-1 w-full rounded"
+              required
+            />
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-1">Password</label>
-          <input
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={e => { setPassword(e.target.value); setError(null) }}
-            className="border px-2 py-1 w-full rounded"
-          />
-        </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Password</label>
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={e => { setPassword(e.target.value); setError(null) }}
+              className="border px-2 py-1 w-full rounded"
+              required
+            />
+          </div>
 
-        <button
-          onClick={handleSubmit}
-          disabled={loading}
-          className="bg-blue-600 text-white px-4 py-2 w-full rounded disabled:opacity-50"
-        >
-          {loading ? 'Logging in...' : 'Log In'}
-        </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="bg-blue-600 text-white px-4 py-2 w-full rounded disabled:opacity-50"
+          >
+            {loading ? 'Logging in...' : 'Log In'}
+          </button>
+        </form>
 
         <p className="text-sm text-center text-gray-600">
           No account?{' '}
