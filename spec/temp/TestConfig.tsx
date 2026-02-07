@@ -132,7 +132,6 @@ export function TestConfigForm() {
           }}
           className="border px-2 py-1 w-full"
         >
-          <option value="5">5 questions</option>
           <option value="10">10 questions</option>
           <option value="25">25 questions</option>
           <option value="50">50 questions</option>

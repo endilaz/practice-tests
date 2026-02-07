@@ -1,6 +1,6 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { questionSchema, bulkImportSchema, type QuestionFormData, type BulkImportData } from './question.schema'
+import { questionSchema, type QuestionFormData } from './question.schema'
 import { useAuth } from '@/auth/useAuth'
 
 // Types matching database schema exactly
@@ -54,15 +54,6 @@ export default function QuestionsAdmin() {
   // Delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
-
-  // Bulk import state
-  const [showImportModal, setShowImportModal] = useState(false)
-  const [importFile, setImportFile] = useState<File | null>(null)
-  const [importData, setImportData] = useState<BulkImportData | null>(null)
-  const [importErrors, setImportErrors] = useState<string[]>([])
-  const [importing, setImporting] = useState(false)
-  const [importSuccess, setImportSuccess] = useState<{ count: number; topic: string } | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Load data on mount
   useEffect(() => {
@@ -222,8 +213,16 @@ export default function QuestionsAdmin() {
     }
   }
 
-  async function updateQuestion(id: string, data: QuestionFormData) {
-    // Step 1: Update question
+  async function updateQuestion(questionId: string, data: QuestionFormData) {
+    // Step 1: Backup existing choices in case update fails
+    const { data: backupChoices, error: backupError } = await supabase
+      .from('answer_choices')
+      .select('*')
+      .eq('question_id', questionId)
+
+    if (backupError) throw new Error('Failed to load existing choices')
+
+    // Step 2: Update question metadata
     const { error: qError } = await supabase
       .from('questions')
       .update({
@@ -232,15 +231,20 @@ export default function QuestionsAdmin() {
         explanation_text: data.explanation_text?.trim() || null,
         difficulty_level: data.difficulty_level,
       })
-      .eq('id', id)
+      .eq('id', questionId)
 
     if (qError) throw qError
 
-    // Step 2: Delete existing choices and insert new ones
-    await supabase.from('answer_choices').delete().eq('question_id', id)
+    // Step 3: Replace all choices (delete + insert)
+    const { error: deleteError } = await supabase
+      .from('answer_choices')
+      .delete()
+      .eq('question_id', questionId)
+
+    if (deleteError) throw deleteError
 
     const choicesData = data.choices.map(c => ({
-      question_id: id,
+      question_id: questionId,
       choice_letter: c.letter,
       choice_text: c.text.trim(),
       is_correct: c.is_correct,
@@ -248,16 +252,26 @@ export default function QuestionsAdmin() {
 
     const { error: cError } = await supabase.from('answer_choices').insert(choicesData)
     
-    if (cError) throw new Error('Failed to update answer choices')
+    if (cError) {
+      // CRITICAL: Restore backup choices to prevent zero-choice state
+      if (backupChoices && backupChoices.length > 0) {
+        await supabase.from('answer_choices').insert(
+          backupChoices.map(({ id, ...rest }) => rest) // Remove id to allow re-insert
+        )
+      }
+      throw new Error('Failed to update choices. Original choices have been restored.')
+    }
   }
 
-  async function handleDelete(id: string) {
+  async function handleDelete(questionId: string) {
     setDeleting(true)
+    
     try {
-      const { error } = await supabase.from('questions').delete().eq('id', id)
+      const { error } = await supabase.from('questions').delete().eq('id', questionId)
       if (error) throw error
-      await loadData()
+      
       setDeleteConfirm(null)
+      await loadData()
     } catch (err: any) {
       console.error('Delete error:', err)
       setError(err.message || 'Failed to delete question')
@@ -266,279 +280,116 @@ export default function QuestionsAdmin() {
     }
   }
 
-  // Bulk Import Functions
-  function openImportModal() {
-    setShowImportModal(true)
-    setImportFile(null)
-    setImportData(null)
-    setImportErrors([])
-    setImportSuccess(null)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
-  }
-
-  function closeImportModal() {
-    setShowImportModal(false)
-    setImportFile(null)
-    setImportData(null)
-    setImportErrors([])
-    setImportSuccess(null)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
-  }
-
-  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    setImportFile(file)
-    setImportData(null)
-    setImportErrors([])
-    setImportSuccess(null)
-
-    // Validate file type
-    if (!file.name.endsWith('.json')) {
-      setImportErrors(['File must be a .json file'])
-      return
-    }
-
-    // Validate file size (5MB max)
-    if (file.size > 5 * 1024 * 1024) {
-      setImportErrors(['File too large. Maximum size is 5MB'])
-      return
-    }
-
-    // Read and parse file
-    try {
-      const text = await file.text()
-      const json = JSON.parse(text)
-
-      // Validate against schema
-      const result = bulkImportSchema.safeParse(json)
-      if (!result.success) {
-        const errors = result.error.errors.map(err => 
-          `${err.path.join('.') || 'Root'}: ${err.message}`
-        )
-        setImportErrors(errors)
-        return
-      }
-
-      setImportData(result.data)
-    } catch (err: any) {
-      if (err instanceof SyntaxError) {
-        setImportErrors(['Invalid JSON file. Please check the file format.'])
-      } else {
-        setImportErrors([err.message || 'Failed to read file'])
-      }
-    }
-  }
-
-  async function handleImport() {
-    if (!importData || !user) return
-
-    setImporting(true)
-    setImportErrors([])
-    setImportSuccess(null)
-
-    try {
-      // Step 1: Find or create topic
-      let topicId: string
-      
-      const existingTopic = topics.find(t => t.name.toLowerCase() === importData.topic.toLowerCase())
-      
-      if (existingTopic) {
-        topicId = existingTopic.id
-      } else {
-        // Create new topic
-        const { data: newTopic, error: topicError } = await supabase
-          .from('topics')
-          .insert({ name: importData.topic.trim() })
-          .select()
-          .single()
-
-        if (topicError) throw new Error(`Failed to create topic: ${topicError.message}`)
-        topicId = newTopic.id
-      }
-
-      // Step 2: Insert all questions (batch by batch for safety)
-      const BATCH_SIZE = 50
-      let successCount = 0
-      const errors: string[] = []
-
-      for (let i = 0; i < importData.questions.length; i += BATCH_SIZE) {
-        const batch = importData.questions.slice(i, i + BATCH_SIZE)
-
-        for (const [idx, q] of batch.entries()) {
-          try {
-            // Insert question
-            const { data: question, error: qError } = await supabase
-              .from('questions')
-              .insert({
-                topic_id: topicId,
-                question_text: q.question_text.trim(),
-                explanation_text: q.explanation_text?.trim() || null,
-                difficulty_level: q.difficulty_level || null,
-                created_by_admin_id: user.id,
-              })
-              .select()
-              .single()
-
-            if (qError) throw qError
-
-            // Insert answer choices
-            const choicesData = q.answer_choices.map(c => ({
-              question_id: question.id,
-              choice_letter: c.letter,
-              choice_text: c.text.trim(),
-              is_correct: c.is_correct,
-            }))
-
-            const { error: cError } = await supabase
-              .from('answer_choices')
-              .insert(choicesData)
-
-            if (cError) {
-              // Rollback: delete the question
-              await supabase.from('questions').delete().eq('id', question.id)
-              throw cError
-            }
-
-            successCount++
-          } catch (err: any) {
-            const questionNum = i + idx + 1
-            errors.push(`Question ${questionNum}: ${err.message}`)
-          }
-        }
-      }
-
-      if (successCount > 0) {
-        setImportSuccess({ count: successCount, topic: importData.topic })
-        await loadData()
-      }
-
-      if (errors.length > 0) {
-        setImportErrors(errors)
-      }
-
-      if (successCount === importData.questions.length) {
-        // Full success - close modal after delay
-        setTimeout(() => {
-          closeImportModal()
-        }, 2000)
-      }
-    } catch (err: any) {
-      console.error('Import error:', err)
-      setImportErrors([err.message || 'Failed to import questions'])
-    } finally {
-      setImporting(false)
-    }
-  }
-
+  // Loading screen
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
+      <div className="p-6">
         <p className="text-gray-600">Loading questions...</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Questions</h2>
-          <p className="text-sm text-gray-600 mt-1">
-            Manage test questions and answer choices
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={openImportModal}
-            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium"
-          >
-            Import JSON
-          </button>
-          <button
-            onClick={openCreateForm}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-          >
-            Create Question
-          </button>
-        </div>
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-gray-900">Questions</h2>
+        <button
+          type="button"
+          onClick={openCreateForm}
+          disabled={topics.length === 0}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          Create Question
+        </button>
       </div>
 
-      {/* Error Display */}
+      {/* Error banner */}
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
           {error}
         </div>
       )}
 
-      {/* Questions List */}
-      {questions.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-          <p className="text-gray-600">No questions created yet</p>
-          <button
-            onClick={openCreateForm}
-            className="mt-4 text-blue-600 hover:text-blue-700 font-medium"
-          >
-            Create your first question
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {questions.map(q => (
-            <div
-              key={q.id}
-              className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="inline-block px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded">
-                      {q.topics.name}
-                    </span>
-                    {q.difficulty_level && (
-                      <span className="inline-block px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded">
-                        Level {q.difficulty_level}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-gray-900 line-clamp-2">{q.question_text}</p>
-                  <p className="text-xs text-gray-500 mt-2">
-                    Created {new Date(q.created_at).toLocaleDateString()}
-                  </p>
-                </div>
-                <div className="flex gap-2 flex-shrink-0">
-                  <button
-                    onClick={() => openEditForm(q.id)}
-                    className="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => setDeleteConfirm(q.id)}
-                    className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded transition-colors"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
+      {/* No topics warning */}
+      {topics.length === 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg">
+          No topics exist. Please create a topic first before adding questions.
         </div>
       )}
 
-      {/* Create/Edit Form Modal */}
+      {/* Questions table */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Question
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Topic
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Difficulty
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {questions.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                  No questions yet. Create one to get started.
+                </td>
+              </tr>
+            ) : (
+              questions.map(q => (
+                <tr key={q.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4">
+                    <p className="text-sm text-gray-900 line-clamp-2">{q.question_text}</p>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{q.topics.name}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600 text-center">
+                    {q.difficulty_level ? (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100">
+                        {q.difficulty_level}/5
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-sm space-x-3">
+                    <button
+                      type="button"
+                      onClick={() => openEditForm(q.id)}
+                      className="text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteConfirm(q.id)}
+                      className="text-red-600 hover:text-red-800 font-medium"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Create/Edit Form Modal - Part 1 */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full my-8">
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              {/* Form Header */}
-              <div className="flex items-center justify-between pb-4 border-b">
+              {/* Modal Header */}
+              <div className="flex justify-between items-center pb-4 border-b">
                 <h3 className="text-xl font-bold text-gray-900">
                   {editingId ? 'Edit Question' : 'Create New Question'}
                 </h3>
@@ -756,188 +607,6 @@ export default function QuestionsAdmin() {
               >
                 {deleting ? 'Deleting...' : 'Delete'}
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Bulk Import Modal */}
-      {showImportModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full my-8">
-            <div className="p-6 space-y-6">
-              {/* Modal Header */}
-              <div className="flex items-center justify-between pb-4 border-b">
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900">Import Questions from JSON</h3>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Upload a JSON file with questions and answer choices
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={closeImportModal}
-                  disabled={importing}
-                  className="text-gray-400 hover:text-gray-600 text-2xl leading-none disabled:opacity-50"
-                >
-                  ×
-                </button>
-              </div>
-
-              {/* Success Message */}
-              {importSuccess && (
-                <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
-                  ✓ Successfully imported {importSuccess.count} question{importSuccess.count !== 1 ? 's' : ''} to topic "{importSuccess.topic}"
-                </div>
-              )}
-
-              {/* Errors */}
-              {importErrors.length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-h-64 overflow-y-auto">
-                  <p className="font-medium text-red-700 mb-2">Errors ({importErrors.length}):</p>
-                  <ul className="space-y-1 text-sm text-red-600">
-                    {importErrors.map((err, idx) => (
-                      <li key={idx} className="flex gap-2">
-                        <span className="flex-shrink-0">•</span>
-                        <span>{err}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* File Input */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select JSON File
-                </label>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".json"
-                  onChange={handleFileSelect}
-                  disabled={importing}
-                  className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
-                />
-                <p className="text-xs text-gray-500 mt-2">
-                  Maximum file size: 5MB. Format must match the JSON schema.
-                </p>
-              </div>
-
-              {/* Preview */}
-              {importData && (
-                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-semibold text-gray-900">Preview</h4>
-                    <span className="text-sm text-gray-600">
-                      {importData.questions.length} question{importData.questions.length !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-gray-600">Topic:</span>
-                      <span className="ml-2 font-medium text-gray-900">{importData.topic}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Status:</span>
-                      <span className="ml-2 font-medium text-green-600">
-                        {topics.find(t => t.name.toLowerCase() === importData.topic.toLowerCase()) 
-                          ? 'Existing topic' 
-                          : 'Will create new topic'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Show first 3 questions preview */}
-                  <div className="space-y-2 mt-4">
-                    <p className="text-xs font-medium text-gray-600 uppercase">First {Math.min(3, importData.questions.length)} Questions:</p>
-                    {importData.questions.slice(0, 3).map((q, idx) => (
-                      <div key={idx} className="bg-white border border-gray-200 rounded p-3 text-sm">
-                        <p className="font-medium text-gray-900 line-clamp-2">{q.question_text}</p>
-                        <div className="mt-2 space-y-1">
-                          {q.answer_choices.map(c => (
-                            <div key={c.letter} className="flex items-start gap-2 text-xs">
-                              <span className={`font-medium ${c.is_correct ? 'text-green-600' : 'text-gray-500'}`}>
-                                {c.letter}.
-                              </span>
-                              <span className={c.is_correct ? 'text-green-600 font-medium' : 'text-gray-600'}>
-                                {c.text}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                    {importData.questions.length > 3 && (
-                      <p className="text-xs text-gray-500 italic text-center">
-                        ... and {importData.questions.length - 3} more
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Format Example */}
-              <details className="text-sm">
-                <summary className="cursor-pointer text-blue-600 hover:text-blue-700 font-medium">
-                  Show JSON format example
-                </summary>
-                <pre className="mt-2 bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-xs">
-{`{
-  "topic": "Accounting",
-  "questions": [
-    {
-      "question_text": "What is the accounting equation?",
-      "difficulty_level": 1,
-      "explanation_text": "The fundamental equation shows...",
-      "answer_choices": [
-        {
-          "letter": "A",
-          "text": "Assets = Liabilities + Equity",
-          "is_correct": true
-        },
-        {
-          "letter": "B",
-          "text": "Assets = Liabilities - Equity",
-          "is_correct": false
-        },
-        {
-          "letter": "C",
-          "text": "Assets + Liabilities = Equity",
-          "is_correct": false
-        },
-        {
-          "letter": "D",
-          "text": "Assets = Revenue - Expenses",
-          "is_correct": false
-        }
-      ]
-    }
-  ]
-}`}
-                </pre>
-              </details>
-
-              {/* Actions */}
-              <div className="flex justify-end gap-3 pt-4 border-t">
-                <button
-                  type="button"
-                  onClick={closeImportModal}
-                  disabled={importing}
-                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleImport}
-                  disabled={!importData || importing}
-                  className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors font-medium"
-                >
-                  {importing ? 'Importing...' : `Import ${importData?.questions.length || 0} Questions`}
-                </button>
-              </div>
             </div>
           </div>
         </div>
