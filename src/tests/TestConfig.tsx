@@ -14,6 +14,7 @@ export function TestConfigForm() {
   const [questionCount, setQuestionCount] = useState('25')
   const [useTimer, setUseTimer] = useState(false)
   const [minutes, setMinutes] = useState('30')
+  const [practiceMode, setPracticeMode] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -57,7 +58,18 @@ export function TestConfigForm() {
 
     setSubmitting(true)
 
-    // Generate the test ONCE here, then navigate with attemptId
+    // Practice mode: navigate with query params (no test_attempts record)
+    if (practiceMode) {
+      const params = new URLSearchParams({
+        mode: 'practice',
+        topic: parsed.data.topicId,
+        count: String(parsed.data.questionCount),
+      })
+      navigate(`/practice?${params.toString()}`)
+      return
+    }
+
+    // Normal test mode: generate test and navigate with attemptId
     const { data, error: rpcError } = await supabase.rpc('generate_test', {
       p_topic_id: parsed.data.topicId,
       p_question_count: parsed.data.questionCount,
@@ -125,12 +137,15 @@ export function TestConfigForm() {
             setUseTimer(e.target.checked)
             setError(null)
           }}
+          disabled={practiceMode}
         />
-        <label>Enable countdown timer</label>
+        <label className={practiceMode ? 'text-gray-400' : ''}>
+          Enable countdown timer
+        </label>
       </div>
 
       <div>
-        <label className="block font-medium mb-1">
+        <label className={`block font-medium mb-1 ${practiceMode ? 'text-gray-400' : ''}`}>
           Time (minutes)
         </label>
         <input
@@ -139,9 +154,29 @@ export function TestConfigForm() {
           max={180}
           value={minutes}
           onChange={e => setMinutes(e.target.value)}
-          disabled={!useTimer}
+          disabled={!useTimer || practiceMode}
           className="border px-2 py-1 w-full disabled:bg-gray-100"
         />
+      </div>
+
+      <div className="border-t pt-4">
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={practiceMode}
+            onChange={e => {
+              setPracticeMode(e.target.checked)
+              if (e.target.checked) {
+                setUseTimer(false) // Disable timer in practice mode
+              }
+              setError(null)
+            }}
+          />
+          <label className="font-medium">Practice Mode</label>
+        </div>
+        <p className="text-xs text-gray-500 mt-1 ml-6">
+          See correct answers immediately after each question. No timer, no score tracking.
+        </p>
       </div>
 
       <button
@@ -149,7 +184,7 @@ export function TestConfigForm() {
         disabled={submitting}
         className="bg-blue-600 text-white px-4 py-2 w-full disabled:opacity-50"
       >
-        {submitting ? 'Starting...' : 'Start Test'}
+        {submitting ? 'Starting...' : practiceMode ? 'Start Practice' : 'Start Test'}
       </button>
     </div>
   )

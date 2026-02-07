@@ -5,6 +5,7 @@ import Register from '@/pages/Register'
 import Dashboard from '@/pages/Dashboard'
 import Admin from '@/pages/Admin'
 import TestShell from '@/tests/TestShell'
+import PracticeShell from '@/tests/PracticeShell'
 import Results from '@/pages/Results'
 
 export const router = createBrowserRouter([
@@ -23,6 +24,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <TestShell />
+      </ProtectedRoute>
+    )
+  },
+  {
+    path: '/practice',
+    element: (
+      <ProtectedRoute>
+        <PracticeShell />
       </ProtectedRoute>
     )
   },
