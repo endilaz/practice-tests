@@ -18,12 +18,22 @@ export function TestConfigForm() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [availableQuestions, setAvailableQuestions] = useState<number>(0)
 
   const navigate = useNavigate()
 
   useEffect(() => {
     loadTopics()
   }, [])
+
+  // Fetch available question count when topic changes
+  useEffect(() => {
+    if (topicId) {
+      fetchAvailableQuestions()
+    } else {
+      setAvailableQuestions(0)
+    }
+  }, [topicId])
 
   async function loadTopics() {
     const { data, error } = await supabase
@@ -39,15 +49,45 @@ export function TestConfigForm() {
     setLoading(false)
   }
 
+  async function fetchAvailableQuestions() {
+    if (!topicId) return
+
+    const { count, error } = await supabase
+      .from('questions')
+      .select('id', { count: 'exact', head: true })
+      .eq('topic_id', topicId)
+
+    if (error) {
+      console.error('Failed to fetch question count:', error)
+    } else {
+      setAvailableQuestions(count ?? 0)
+    }
+  }
+
+  function handleQuestionCountChange(value: string) {
+    // Allow empty string, digits, or "0" for infinite mode
+    if (value === '' || /^\d+$/.test(value)) {
+      setQuestionCount(value)
+      setError(null)
+    }
+  }
+
   async function submit() {
     if (submitting) return
     setError(null)
 
-    const count = Number(questionCount)
+    // Parse question count
+    const count = questionCount === '' ? 0 : Number(questionCount)
 
     // Validate infinite mode is only for practice
     if (count === 0 && !practiceMode) {
       setError('Infinite questions is only available in Practice Mode.')
+      return
+    }
+
+    // Check available questions (only for non-infinite mode)
+    if (count > 0 && count > availableQuestions) {
+      setError(`Only ${availableQuestions} question${availableQuestions !== 1 ? 's' : ''} available in this topic`)
       return
     }
 
@@ -118,27 +158,37 @@ export function TestConfigForm() {
             </option>
           ))}
         </select>
+        {topicId && availableQuestions > 0 && (
+          <p className="text-xs text-gray-500 mt-1">
+            {availableQuestions} question{availableQuestions !== 1 ? 's' : ''} available
+          </p>
+        )}
+        {topicId && availableQuestions === 0 && (
+          <p className="text-xs text-red-500 mt-1">
+            No questions available in this topic
+          </p>
+        )}
       </div>
 
       <div>
         <label className="block font-medium mb-1">
           Number of Questions
         </label>
-        <select
+        <input
+          type="number"
+          min={practiceMode ? 0 : 1}
+          max={100}
           value={questionCount}
-          onChange={e => {
-            setQuestionCount(e.target.value)
-            setError(null)
-          }}
+          onChange={e => handleQuestionCountChange(e.target.value)}
           className="border px-2 py-1 w-full"
-        >
-          <option value="5">5 questions</option>
-          <option value="10">10 questions</option>
-          <option value="25">25 questions</option>
-          <option value="50">50 questions</option>
-          <option value="100">100 questions</option>
-          <option value="0">Infinite (practice mode only)</option>
-        </select>
+          placeholder={practiceMode ? "Enter number (0 for infinite)" : "Enter number (1-100)"}
+          disabled={submitting}
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          {practiceMode 
+            ? 'Enter 0 for infinite practice mode' 
+            : 'Maximum 100 questions per test'}
+        </p>
       </div>
 
       <div className="flex items-center gap-2">
@@ -193,8 +243,8 @@ export function TestConfigForm() {
 
       <button
         onClick={submit}
-        disabled={submitting}
-        className="bg-blue-600 text-white px-4 py-2 w-full disabled:opacity-50"
+        disabled={submitting || !topicId || availableQuestions === 0 || questionCount === ''}
+        className="bg-blue-600 text-white px-4 py-2 w-full disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {submitting ? 'Starting...' : practiceMode ? 'Start Practice' : 'Start Test'}
       </button>
