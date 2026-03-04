@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { questionSchema, bulkImportSchema, type QuestionFormData, type BulkImportData } from './question.schema'
 import { useAuth } from '@/auth/useAuth'
+import { DocxImport } from './DocxImport'
 
 // Types matching database schema exactly
 type Topic = {
@@ -62,6 +63,7 @@ export default function QuestionsAdmin() {
   const [importErrors, setImportErrors] = useState<string[]>([])
   const [importing, setImporting] = useState(false)
   const [importSuccess, setImportSuccess] = useState<{ count: number; topic: string } | null>(null)
+  const [importTab, setImportTab] = useState<'json' | 'docx'>('json')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Load data on mount
@@ -456,7 +458,19 @@ export default function QuestionsAdmin() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={openImportModal}
+            onClick={() => {
+              setImportTab('docx')
+              openImportModal()
+            }}
+            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors font-medium"
+          >
+            Import DOCX
+          </button>
+          <button
+            onClick={() => {
+              setImportTab('json')
+              openImportModal()
+            }}
             className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium"
           >
             Import JSON
@@ -761,7 +775,7 @@ export default function QuestionsAdmin() {
         </div>
       )}
 
-      {/* Bulk Import Modal */}
+      {/* Bulk Import Modal with Tabs */}
       {showImportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full my-8">
@@ -769,9 +783,9 @@ export default function QuestionsAdmin() {
               {/* Modal Header */}
               <div className="flex items-center justify-between pb-4 border-b">
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900">Import Questions from JSON</h3>
+                  <h3 className="text-xl font-bold text-gray-900">Import Questions</h3>
                   <p className="text-sm text-gray-600 mt-1">
-                    Upload a JSON file with questions and answer choices
+                    Import from JSON or DOCX files
                   </p>
                 </div>
                 <button
@@ -784,106 +798,133 @@ export default function QuestionsAdmin() {
                 </button>
               </div>
 
-              {/* Success Message */}
-              {importSuccess && (
-                <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
-                  ✓ Successfully imported {importSuccess.count} question{importSuccess.count !== 1 ? 's' : ''} to topic "{importSuccess.topic}"
-                </div>
-              )}
-
-              {/* Errors */}
-              {importErrors.length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-h-64 overflow-y-auto">
-                  <p className="font-medium text-red-700 mb-2">Errors ({importErrors.length}):</p>
-                  <ul className="space-y-1 text-sm text-red-600">
-                    {importErrors.map((err, idx) => (
-                      <li key={idx} className="flex gap-2">
-                        <span className="flex-shrink-0">•</span>
-                        <span>{err}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* File Input */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select JSON File
-                </label>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".json"
-                  onChange={handleFileSelect}
-                  disabled={importing}
-                  className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
-                />
-                <p className="text-xs text-gray-500 mt-2">
-                  Maximum file size: 5MB. Format must match the JSON schema.
-                </p>
+              {/* Tab Navigation */}
+              <div className="flex gap-2 border-b">
+                <button
+                  onClick={() => setImportTab('json')}
+                  className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
+                    importTab === 'json'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  JSON Import
+                </button>
+                <button
+                  onClick={() => setImportTab('docx')}
+                  className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
+                    importTab === 'docx'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  DOCX Import
+                </button>
               </div>
 
-              {/* Preview */}
-              {importData && (
-                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-semibold text-gray-900">Preview</h4>
-                    <span className="text-sm text-gray-600">
-                      {importData.questions.length} question{importData.questions.length !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-gray-600">Topic:</span>
-                      <span className="ml-2 font-medium text-gray-900">{importData.topic}</span>
+              {/* Tab Content */}
+              {importTab === 'json' ? (
+                <div className="space-y-6">
+                  {/* Success Message */}
+                  {importSuccess && (
+                    <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
+                      ✓ Successfully imported {importSuccess.count} question{importSuccess.count !== 1 ? 's' : ''} to topic "{importSuccess.topic}"
                     </div>
-                    <div>
-                      <span className="text-gray-600">Status:</span>
-                      <span className="ml-2 font-medium text-green-600">
-                        {topics.find(t => t.name.toLowerCase() === importData.topic.toLowerCase()) 
-                          ? 'Existing topic' 
-                          : 'Will create new topic'}
-                      </span>
+                  )}
+
+                  {/* Errors */}
+                  {importErrors.length > 0 && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-h-64 overflow-y-auto">
+                      <p className="font-medium text-red-700 mb-2">Errors ({importErrors.length}):</p>
+                      <ul className="space-y-1 text-sm text-red-600">
+                        {importErrors.map((err, idx) => (
+                          <li key={idx} className="flex gap-2">
+                            <span className="flex-shrink-0">•</span>
+                            <span>{err}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
+                  )}
+
+                  {/* File Input */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Select JSON File
+                    </label>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".json"
+                      onChange={handleFileSelect}
+                      disabled={importing}
+                      className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
+                    />
+                    <p className="text-xs text-gray-500 mt-2">
+                      Maximum file size: 5MB. Format must match the JSON schema.
+                    </p>
                   </div>
 
-                  {/* Show first 3 questions preview */}
-                  <div className="space-y-2 mt-4">
-                    <p className="text-xs font-medium text-gray-600 uppercase">First {Math.min(3, importData.questions.length)} Questions:</p>
-                    {importData.questions.slice(0, 3).map((q, idx) => (
-                      <div key={idx} className="bg-white border border-gray-200 rounded p-3 text-sm">
-                        <p className="font-medium text-gray-900 line-clamp-2">{q.question_text}</p>
-                        <div className="mt-2 space-y-1">
-                          {q.answer_choices.map(c => (
-                            <div key={c.letter} className="flex items-start gap-2 text-xs">
-                              <span className={`font-medium ${c.is_correct ? 'text-green-600' : 'text-gray-500'}`}>
-                                {c.letter}.
-                              </span>
-                              <span className={c.is_correct ? 'text-green-600 font-medium' : 'text-gray-600'}>
-                                {c.text}
-                              </span>
-                            </div>
-                          ))}
+                  {/* Preview */}
+                  {importData && (
+                    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-semibold text-gray-900">Preview</h4>
+                        <span className="text-sm text-gray-600">
+                          {importData.questions.length} question{importData.questions.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <span className="text-gray-600">Topic:</span>
+                          <span className="ml-2 font-medium text-gray-900">{importData.topic}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Status:</span>
+                          <span className="ml-2 font-medium text-green-600">
+                            {topics.find(t => t.name.toLowerCase() === importData.topic.toLowerCase()) 
+                              ? 'Existing topic' 
+                              : 'Will create new topic'}
+                          </span>
                         </div>
                       </div>
-                    ))}
-                    {importData.questions.length > 3 && (
-                      <p className="text-xs text-gray-500 italic text-center">
-                        ... and {importData.questions.length - 3} more
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
 
-              {/* Format Example */}
-              <details className="text-sm">
-                <summary className="cursor-pointer text-blue-600 hover:text-blue-700 font-medium">
-                  Show JSON format example
-                </summary>
-                <pre className="mt-2 bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-xs">
+                      {/* Show first 3 questions preview */}
+                      <div className="space-y-2 mt-4">
+                        <p className="text-xs font-medium text-gray-600 uppercase">First {Math.min(3, importData.questions.length)} Questions:</p>
+                        {importData.questions.slice(0, 3).map((q, idx) => (
+                          <div key={idx} className="bg-white border border-gray-200 rounded p-3 text-sm">
+                            <p className="font-medium text-gray-900 line-clamp-2">{q.question_text}</p>
+                            <div className="mt-2 space-y-1">
+                              {q.answer_choices.map(c => (
+                                <div key={c.letter} className="flex items-start gap-2 text-xs">
+                                  <span className={`font-medium ${c.is_correct ? 'text-green-600' : 'text-gray-500'}`}>
+                                    {c.letter}.
+                                  </span>
+                                  <span className={c.is_correct ? 'text-green-600 font-medium' : 'text-gray-600'}>
+                                    {c.text}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                        {importData.questions.length > 3 && (
+                          <p className="text-xs text-gray-500 italic text-center">
+                            ... and {importData.questions.length - 3} more
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Format Example */}
+                  <details className="text-sm">
+                    <summary className="cursor-pointer text-blue-600 hover:text-blue-700 font-medium">
+                      Show JSON format example
+                    </summary>
+                    <pre className="mt-2 bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-xs">
 {`{
   "topic": "Accounting",
   "questions": [
@@ -938,6 +979,11 @@ export default function QuestionsAdmin() {
                   {importing ? 'Importing...' : `Import ${importData?.questions.length || 0} Questions`}
                 </button>
               </div>
+            </div>
+          ) : (
+            // DOCX Import Component
+            <DocxImport />
+          )}
             </div>
           </div>
         </div>
