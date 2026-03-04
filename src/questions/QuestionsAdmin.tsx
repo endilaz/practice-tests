@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { questionSchema, bulkImportSchema, type QuestionFormData, type BulkImportData } from './question.schema'
 import { useAuth } from '@/auth/useAuth'
@@ -31,6 +31,7 @@ type AnswerChoice = {
 const LETTERS = ['A', 'B', 'C', 'D'] as const
 
 export default function QuestionsAdmin() {
+  type SortKey = 'date_desc' | 'date_asc' | 'topic_asc' | 'difficulty_asc' | 'difficulty_desc'
   const { user } = useAuth()
   
   // Data state
@@ -55,6 +56,40 @@ export default function QuestionsAdmin() {
   // Delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+
+  // --- Search / filter / sort state ---
+  const [searchText, setSearchText] = useState('')
+  const [filterTopicId, setFilterTopicId] = useState<string>('') // '' = all topics
+  const [sortKey, setSortKey] = useState<SortKey>('date_desc')
+
+  // Derived list: search → topic filter → sort. No extra DB calls.
+  const filteredQuestions = useMemo(() => {
+    const needle = searchText.trim().toLowerCase()
+
+    let result = questions.filter(q => {
+      const matchesSearch = !needle || q.question_text.toLowerCase().includes(needle)
+      const matchesTopic = !filterTopicId || q.topic_id === filterTopicId
+      return matchesSearch && matchesTopic
+    })
+
+    result = [...result].sort((a, b) => {
+      switch (sortKey) {
+        case 'date_desc':
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        case 'date_asc':
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        case 'topic_asc':
+          return a.topics.name.localeCompare(b.topics.name)
+        case 'difficulty_asc':
+          return (a.difficulty_level ?? 6) - (b.difficulty_level ?? 6)
+        case 'difficulty_desc':
+          return (b.difficulty_level ?? 0) - (a.difficulty_level ?? 0)
+        default:
+          return 0
+      }
+    })
+    return result
+  }, [questions, searchText, filterTopicId, sortKey])
 
   // Bulk import state
   const [showImportModal, setShowImportModal] = useState(false)
@@ -491,6 +526,57 @@ export default function QuestionsAdmin() {
         </div>
       )}
 
+      {/* Search / Filter / Sort bar — only shown once questions exist */}
+      {questions.length > 0 && (
+        <div className="flex flex-wrap gap-3 items-center bg-gray-50 border border-gray-200 rounded-lg p-3">
+          {/* Text search */}
+          <div className="flex-1 min-w-48">
+            <input
+              type="search"
+              placeholder="Search question text…"
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Topic filter */}
+          <select
+            value={filterTopicId}
+            onChange={e => setFilterTopicId(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All topics</option>
+            {topics.map(t => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+
+          {/* Sort */}
+          <select
+            value={sortKey}
+            onChange={e => setSortKey(e.target.value as SortKey)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="date_desc">Newest first</option>
+            <option value="date_asc">Oldest first</option>
+            <option value="topic_asc">Topic (A–Z)</option>
+            <option value="difficulty_asc">Difficulty (low → high)</option>
+            <option value="difficulty_desc">Difficulty (high → low)</option>
+          </select>
+
+          {/* Clear filters — only visible when something is active */}
+          {(searchText || filterTopicId || sortKey !== 'date_desc') && (
+            <button
+              onClick={() => { setSearchText(''); setFilterTopicId(''); setSortKey('date_desc') }}
+              className="text-sm text-gray-500 hover:text-gray-700 underline whitespace-nowrap"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Questions List */}
       {questions.length === 0 ? (
         <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
@@ -504,7 +590,22 @@ export default function QuestionsAdmin() {
         </div>
       ) : (
         <div className="space-y-3">
-          {questions.map(q => (
+          {/* Result count */}
+          <p className="text-sm text-gray-500">
+            Showing {filteredQuestions.length} of {questions.length} question{questions.length !== 1 ? 's' : ''}
+          </p>
+
+          {filteredQuestions.length === 0 ? (
+            <div className="text-center py-10 bg-gray-50 rounded-lg border border-gray-200">
+              <p className="text-gray-500">No questions match your filters.</p>
+              <button
+                onClick={() => { setSearchText(''); setFilterTopicId(''); setSortKey('date_desc') }}
+                className="mt-2 text-blue-600 hover:text-blue-700 text-sm underline"
+              >
+                Clear filters
+              </button>
+            </div>
+          ) : filteredQuestions.map(q => (
             <div
               key={q.id}
               className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
