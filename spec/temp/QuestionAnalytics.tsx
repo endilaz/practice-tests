@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
 type QuestionStat = {
@@ -40,41 +40,6 @@ export default function QuestionAnalytics() {
   const [answerDist, setAnswerDist] = useState<AnswerDistribution[]>([])
   const [feedback, setFeedback] = useState<Feedback[]>([])
   const [loadingDetail, setLoadingDetail] = useState(false)
-
-  type SortKey =
-| 'attempts_desc' | 'attempts_asc'
-| 'correct_desc'  | 'correct_asc'
-| 'time_desc'     | 'time_asc'
-| 'marked_desc'
-  const [searchText, setSearchText]     = useState('')
-  const [filterTopic, setFilterTopic]   = useState('')
-  const [sortKey, setSortKey]           = useState<SortKey>('attempts_desc')
-  // Unique topic names derived from loaded stats — no extra DB call
-  const topicOptions = useMemo(
-    () => Array.from(new Set(stats.map(s => s.topic_name))).sort(),
-    [stats]
-  )
-  const filteredStats = useMemo(() => {
-    const needle = searchText.trim().toLowerCase()
-    let result = stats.filter(s => {
-      const matchesSearch = !needle || s.question_text.toLowerCase().includes(needle)
-      const matchesTopic  = !filterTopic || s.topic_name === filterTopic
-      return matchesSearch && matchesTopic
-    })
-    result = [...result].sort((a, b) => {
-      switch (sortKey) {
-        case 'attempts_desc': return b.times_attempted - a.times_attempted
-        case 'attempts_asc':  return a.times_attempted - b.times_attempted
-        case 'correct_desc':  return b.correctness_percentage - a.correctness_percentage
-        case 'correct_asc':   return a.correctness_percentage - b.correctness_percentage
-        case 'time_desc':     return b.avg_time_spent - a.avg_time_spent
-        case 'time_asc':      return a.avg_time_spent - b.avg_time_spent
-        case 'marked_desc':   return b.times_marked - a.times_marked
-        default: return 0
-      }
-    })
-    return result
-  }, [stats, searchText, filterTopic, sortKey])
 
   useEffect(() => {
     loadQuestionStats()
@@ -233,58 +198,8 @@ export default function QuestionAnalytics() {
           <p className="text-gray-500">No question data available yet</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {/* Filter bar */}
-          <div className="flex flex-wrap gap-3 items-center bg-gray-50 border border-gray-200 rounded-lg p-3">
-            <div className="flex-1 min-w-48">
-              <input
-                type="search"
-                placeholder="Search question text…"
-                value={searchText}
-                onChange={e => setSearchText(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <select
-              value={filterTopic}
-              onChange={e => setFilterTopic(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All topics</option>
-              {topicOptions.map(t => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-            <select
-              value={sortKey}
-              onChange={e => setSortKey(e.target.value as SortKey)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="attempts_desc">Most attempted</option>
-              <option value="attempts_asc">Least attempted</option>
-              <option value="correct_desc">Highest correct %</option>
-              <option value="correct_asc">Lowest correct %</option>
-              <option value="time_desc">Slowest (avg time)</option>
-              <option value="time_asc">Fastest (avg time)</option>
-              <option value="marked_desc">Most marked for review</option>
-            </select>
-            {(searchText || filterTopic || sortKey !== 'attempts_desc') && (
-              <button
-                onClick={() => { setSearchText(''); setFilterTopic(''); setSortKey('attempts_desc') }}
-                className="text-sm text-gray-500 hover:text-gray-700 underline whitespace-nowrap"
-              >
-                Clear filters
-              </button>
-            )}
-          </div>
-
-          {/* Result count */}
-          <p className="text-sm text-gray-500">
-            Showing {filteredStats.length} of {stats.length} question{stats.length !== 1 ? 's' : ''}
-          </p>
-
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto">
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
@@ -299,19 +214,7 @@ export default function QuestionAnalytics() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                  {filteredStats.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="px-6 py-10 text-center text-gray-500">
-                        No questions match your filters.{' '}
-                        <button
-                          onClick={() => { setSearchText(''); setFilterTopic(''); setSortKey('attempts_desc') }}
-                          className="text-blue-600 hover:text-blue-800 underline"
-                        >
-                          Clear filters
-                        </button>
-                      </td>
-                    </tr>
-                  ) : filteredStats.map(stat => (
+                {stats.map(stat => (
                   <tr key={stat.question_id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 max-w-xs">
                       <p className="text-sm text-gray-900 line-clamp-2">{stat.question_text}</p>
@@ -349,7 +252,6 @@ export default function QuestionAnalytics() {
                 ))}
               </tbody>
             </table>
-          </div>
           </div>
         </div>
       )}

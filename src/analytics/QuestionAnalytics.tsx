@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 
+// Matches the return type of the get_question_analytics RPC.
+// Note: correctness_pct (not correctness_percentage) to align with the DB function column name.
 type QuestionStat = {
   question_id: string
   question_text: string
   topic_name: string
   times_attempted: number
   times_correct: number
-  correctness_percentage: number
+  correctness_pct: number
   avg_time_spent: number
   times_marked: number
   avg_difficulty: number | null
@@ -30,88 +32,110 @@ type Feedback = {
   created_at: string
 }
 
+type SortKey =
+  | 'attempts_desc' | 'attempts_asc'
+  | 'correct_desc'  | 'correct_asc'
+  | 'time_desc'     | 'time_asc'
+  | 'marked_desc'
+
+const PAGE_SIZE = 50
+
 export default function QuestionAnalytics() {
-  const [stats, setStats] = useState<QuestionStat[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // --- List state ---
+  const [stats, setStats]           = useState<QuestionStat[]>([])
+  const [totalCount, setTotalCount] = useState(0)
+  const [loading, setLoading]       = useState(true)
+  const [error, setError]           = useState<string | null>(null)
 
-  // Detail modal state
+  // --- Filter / sort / pagination ---
+  const [page, setPage]                       = useState(0) // 0-indexed
+  const [searchText, setSearchText]           = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [filterTopic, setFilterTopic]         = useState('')
+  const [sortKey, setSortKey]                 = useState<SortKey>('attempts_desc')
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Topic options for filter dropdown — loaded once, always a small list
+  const [topicOptions, setTopicOptions] = useState<string[]>([])
+
+  // --- Detail modal state ---
   const [selectedQuestion, setSelectedQuestion] = useState<QuestionStat | null>(null)
-  const [answerDist, setAnswerDist] = useState<AnswerDistribution[]>([])
-  const [feedback, setFeedback] = useState<Feedback[]>([])
-  const [loadingDetail, setLoadingDetail] = useState(false)
+  const [answerDist, setAnswerDist]             = useState<AnswerDistribution[]>([])
+  const [feedback, setFeedback]                 = useState<Feedback[]>([])
+  const [loadingDetail, setLoadingDetail]       = useState(false)
 
+  // Load topic names once on mount for the filter dropdown
   useEffect(() => {
-    loadQuestionStats()
+    supabase
+      .from('topics')
+      .select('name')
+      .order('name')
+      .then(({ data }) => {
+        if (data) setTopicOptions(data.map((t: { name: string }) => t.name))
+      })
   }, [])
 
-  async function loadQuestionStats() {
+  // Debounce search input: wait 300ms after last keystroke before updating
+  // debouncedSearch (which triggers the fetch). Also resets page to 0.
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+    searchDebounceRef.current = setTimeout(() => {
+      setPage(0)
+      setDebouncedSearch(searchText)
+    }, 300)
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+    }
+  }, [searchText])
+
+  // Reset to page 0 when topic filter or sort changes (discrete selections, no debounce needed)
+  useEffect(() => { setPage(0) }, [filterTopic, sortKey])
+
+  // Main fetch — 2 parallel RPC calls replacing the old ~6000 per-question requests.
+  // Runs whenever page, debouncedSearch, filterTopic, or sortKey changes.
+  const loadQuestionStats = useCallback(async () => {
     setLoading(true)
     setError(null)
 
     try {
-      // Get all questions with their stats
-      const { data: questions, error: qError } = await supabase
-        .from('questions')
-        .select('id, question_text, topics(name)')
-        .order('created_at', { ascending: false })
+      const [statsRes, countRes] = await Promise.all([
+        supabase.rpc('get_question_analytics', {
+          p_search: debouncedSearch,
+          p_topic:  filterTopic,
+          p_sort:   sortKey,
+          p_limit:  PAGE_SIZE,
+          p_offset: page * PAGE_SIZE,
+        }),
+        supabase.rpc('get_question_analytics_count', {
+          p_search: debouncedSearch,
+          p_topic:  filterTopic,
+        }),
+      ])
 
-      if (qError) throw qError
+      if (statsRes.error) throw statsRes.error
+      if (countRes.error) throw countRes.error
 
-      // For each question, calculate stats from question_responses
-      const statsPromises = questions.map(async (q: any) => {
-        const { data: responses } = await supabase
-          .from('question_responses')
-          .select('is_correct, time_spent_seconds, marked_for_review')
-          .eq('question_id', q.id)
-
-        const { data: feedbackData } = await supabase
-          .from('question_feedback')
-          .select('difficulty_rating, quality_rating')
-          .eq('question_id', q.id)
-
-        const timesAttempted = responses?.length || 0
-        const timesCorrect = responses?.filter(r => r.is_correct === true).length || 0
-        const timesMarked = responses?.filter(r => r.marked_for_review).length || 0
-        const totalTime = responses?.reduce((sum, r) => sum + (r.time_spent_seconds || 0), 0) || 0
-
-        const avgDifficulty = feedbackData && feedbackData.length > 0
-          ? feedbackData.reduce((sum, f) => sum + (f.difficulty_rating || 0), 0) / feedbackData.filter(f => f.difficulty_rating).length
-          : null
-
-        const avgQuality = feedbackData && feedbackData.length > 0
-          ? feedbackData.reduce((sum, f) => sum + (f.quality_rating || 0), 0) / feedbackData.filter(f => f.quality_rating).length
-          : null
-
-        return {
-          question_id: q.id,
-          question_text: q.question_text,
-          topic_name: q.topics?.name || 'Unknown',
-          times_attempted: timesAttempted,
-          times_correct: timesCorrect,
-          correctness_percentage: timesAttempted > 0 ? Math.round((timesCorrect / timesAttempted) * 100) : 0,
-          avg_time_spent: timesAttempted > 0 ? Math.round(totalTime / timesAttempted) : 0,
-          times_marked: timesMarked,
-          avg_difficulty: avgDifficulty ? Math.round(avgDifficulty * 10) / 10 : null,
-          avg_quality: avgQuality ? Math.round(avgQuality * 10) / 10 : null,
-        }
-      })
-
-      const calculatedStats = await Promise.all(statsPromises)
-      setStats(calculatedStats)
+      setStats(statsRes.data as QuestionStat[])
+      // Cast to Number: Supabase returns bigint as string in some JS environments
+      setTotalCount(Number(countRes.data))
     } catch (err: any) {
       console.error('Load question stats error:', err)
       setError(err.message || 'Failed to load question analytics')
     } finally {
       setLoading(false)
     }
-  }
+  }, [page, debouncedSearch, filterTopic, sortKey])
 
+  useEffect(() => {
+    loadQuestionStats()
+  }, [loadQuestionStats])
+
+  // --- Detail modal ---
   async function loadQuestionDetail(questionId: string) {
     setLoadingDetail(true)
 
     try {
-      // Load answer distribution
+      // Load answer distribution — 4 choices max, so 4 count queries is fine here
       const { data: choices } = await supabase
         .from('answer_choices')
         .select('id, choice_letter, choice_text, is_correct')
@@ -171,18 +195,21 @@ export default function QuestionAnalytics() {
     setFeedback([])
   }
 
-  if (loading) {
-    return (
-      <div className="p-6">
-        <p className="text-gray-600">Loading question analytics...</p>
-      </div>
-    )
+  function clearFilters() {
+    setSearchText('')
+    setFilterTopic('')
+    setSortKey('attempts_desc')
   }
 
+  const hasActiveFilters = searchText || filterTopic || sortKey !== 'attempts_desc'
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE)
+
+  // Top-level error state (shown above the filter bar so filters remain usable)
   if (error) {
     return (
-      <div className="p-6">
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+      <div className="p-6 space-y-4">
+        <h2 className="text-2xl font-bold">Question Analytics</h2>
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
           {error}
         </div>
       </div>
@@ -193,28 +220,103 @@ export default function QuestionAnalytics() {
     <div className="p-6 space-y-6">
       <h2 className="text-2xl font-bold">Question Analytics</h2>
 
-      {stats.length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center">
-          <p className="text-gray-500">No question data available yet</p>
+      {/* Filter / sort bar */}
+      <div className="flex flex-wrap gap-3 items-center bg-gray-50 border border-gray-200 rounded-lg p-3">
+        <div className="flex-1 min-w-48">
+          <input
+            type="search"
+            placeholder="Search question text…"
+            value={searchText}
+            onChange={e => setSearchText(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </div>
-      ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
+
+        <select
+          value={filterTopic}
+          onChange={e => setFilterTopic(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">All topics</option>
+          {topicOptions.map(t => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+
+        <select
+          value={sortKey}
+          onChange={e => setSortKey(e.target.value as SortKey)}
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="attempts_desc">Most attempted</option>
+          <option value="attempts_asc">Least attempted</option>
+          <option value="correct_desc">Highest correct %</option>
+          <option value="correct_asc">Lowest correct %</option>
+          <option value="time_desc">Slowest (avg time)</option>
+          <option value="time_asc">Fastest (avg time)</option>
+          <option value="marked_desc">Most marked for review</option>
+        </select>
+
+        {hasActiveFilters && (
+          <button
+            onClick={clearFilters}
+            className="text-sm text-gray-500 hover:text-gray-700 underline whitespace-nowrap"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
+
+      {/* Result count */}
+      {!loading && totalCount > 0 && (
+        <p className="text-sm text-gray-500">
+          Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalCount)} of {totalCount} question{totalCount !== 1 ? 's' : ''}
+        </p>
+      )}
+
+      {/* Table */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Question</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Topic</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Attempts</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Correct %</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Time</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Marked</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ratings</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {loading ? (
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Question</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Topic</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Attempts</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Correct %</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Time</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Marked</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ratings</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                  <td colSpan={8} className="px-6 py-10 text-center text-gray-500">
+                    Loading...
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {stats.map(stat => (
+              ) : stats.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-6 py-10 text-center text-gray-500">
+                    {hasActiveFilters ? (
+                      <>
+                        No questions match your filters.{' '}
+                        <button
+                          onClick={clearFilters}
+                          className="text-blue-600 hover:text-blue-800 underline"
+                        >
+                          Clear filters
+                        </button>
+                      </>
+                    ) : (
+                      'No question data available yet.'
+                    )}
+                  </td>
+                </tr>
+              ) : (
+                stats.map(stat => (
                   <tr key={stat.question_id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 max-w-xs">
                       <p className="text-sm text-gray-900 line-clamp-2">{stat.question_text}</p>
@@ -223,13 +325,13 @@ export default function QuestionAnalytics() {
                     <td className="px-6 py-4 text-sm text-gray-900">{stat.times_attempted}</td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                        stat.correctness_percentage >= 70
+                        stat.correctness_pct >= 70
                           ? 'bg-green-100 text-green-800'
-                          : stat.correctness_percentage >= 50
+                          : stat.correctness_pct >= 50
                           ? 'bg-yellow-100 text-yellow-800'
                           : 'bg-red-100 text-red-800'
                       }`}>
-                        {stat.correctness_percentage}%
+                        {stat.correctness_pct}%
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">{stat.avg_time_spent}s</td>
@@ -249,10 +351,33 @@ export default function QuestionAnalytics() {
                       </button>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Pagination — only shown when there's more than one page */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => setPage(p => p - 1)}
+            disabled={page === 0 || loading}
+            className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            ← Previous
+          </button>
+          <span className="text-sm text-gray-600">
+            Page {page + 1} of {totalPages}
+          </span>
+          <button
+            onClick={() => setPage(p => p + 1)}
+            disabled={(page + 1) * PAGE_SIZE >= totalCount || loading}
+            className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            Next →
+          </button>
         </div>
       )}
 
