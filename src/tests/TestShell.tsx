@@ -14,7 +14,7 @@ type Question = {
 type AnswerChoice = {
   id: string
   question_id: string
-  choice_letter: string // original DB letter — used only for matching display order, never shown
+  choice_letter: string // original DB letter — used only for matching display order, never shown as-is
   choice_text: string
 }
 
@@ -32,6 +32,9 @@ type ViewMode = 'one' | 'all' | 'review'
 // Positional labels rendered to the user. Always A B C D top-to-bottom
 // regardless of the DB's internal choice_letter values.
 const DISPLAY_LABELS = ['A', 'B', 'C', 'D']
+
+// Navy theme color — defined once so it's easy to update
+const NAVY = '#1a2e5a'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -57,6 +60,7 @@ type QuestionCardProps = {
   viewMode: ViewMode
   currentIndex: number
   selectAnswer: (questionId: string, choiceId: string) => void
+  clearAnswer: (questionId: string) => void
   toggleElimination: (questionId: string, choiceId: string) => void
   toggleMarked: (questionId: string) => void
   openReport: (questionId: string) => void
@@ -68,8 +72,8 @@ type QuestionCardProps = {
 function QuestionCard(props: QuestionCardProps) {
   const {
     question, responses, choices, questions, viewMode, currentIndex,
-    selectAnswer, toggleElimination, toggleMarked, openReport, goTo,
-    prevIndex, nextIndex
+    selectAnswer, clearAnswer, toggleElimination, toggleMarked, openReport,
+    goTo, prevIndex, nextIndex,
   } = props
 
   const row = responses.find(r => r.question_id === question.id)
@@ -77,107 +81,162 @@ function QuestionCard(props: QuestionCardProps) {
   const qIdx = questions.findIndex(q => q.id === question.id)
 
   return (
-    <div id={`q-${question.id}`} className="bg-white rounded-xl shadow-lg p-8 space-y-6">
-      {/* progress + report trigger */}
-      <div className="flex justify-between items-center">
-        <span className="text-sm text-gray-500">
-          Question {qIdx + 1} of {questions.length}
+    <div id={`q-${question.id}`} className="bg-white rounded-xl shadow-lg overflow-hidden">
+
+      {/* ── dark navy question header band ───────────────────────────────── */}
+      <div
+        className="px-6 py-3 flex justify-between items-center"
+        style={{ backgroundColor: NAVY }}
+      >
+        <span className="text-white font-semibold text-sm tracking-wide">
+          Question #{qIdx + 1}
         </span>
         <button
           type="button"
           onClick={() => openReport(question.id)}
-          className="text-xs text-gray-500 border border-gray-300 px-2 py-1 rounded hover:bg-gray-100 transition-colors"
+          className="text-blue-200 hover:text-white text-xs border border-blue-400 hover:border-white px-2 py-1 rounded transition-colors"
         >
           Report Issue
         </button>
       </div>
 
-      {/* question text */}
-      <h2 className="text-xl font-bold text-gray-900">{question.question_text}</h2>
+      <div className="p-6 space-y-5">
 
-      {/* answer choices */}
-      <div className="space-y-3">
-        {ordered.map((choice, i) => {
-          const isEliminated = row?.eliminated_choices?.includes(choice.id) ?? false
-          const isSelected   = row?.selected_choice_id === choice.id
+        {/* ── question text ────────────────────────────────────────────────── */}
+        <p className="text-gray-900 text-base leading-relaxed">
+          {question.question_text}
+        </p>
 
-          return (
-            <div key={choice.id} className="flex items-center gap-2">
-              {/* choice button */}
-              <button
-                type="button"
-                onClick={() => selectAnswer(question.id, choice.id)}
-                disabled={isEliminated}
-                className={[
-                  'flex-1 text-left px-4 py-3 rounded-lg border-2 transition-colors',
-                  isEliminated
-                    ? 'bg-red-50 border-red-200 text-red-400 line-through cursor-not-allowed'
-                    : isSelected
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-gray-900 border-gray-300 hover:bg-blue-50 hover:border-blue-300',
-                ].join(' ')}
-              >
-                <span className="font-semibold">{DISPLAY_LABELS[i]}.</span>{' '}
-                {choice.choice_text}
-              </button>
+        {/* ── answer choices ───────────────────────────────────────────────── */}
+        <div className="space-y-2">
+          {ordered.map((choice, i) => {
+            const isEliminated = row?.eliminated_choices?.includes(choice.id) ?? false
+            const isSelected   = row?.selected_choice_id === choice.id
 
-              {/* elimination toggle */}
-              <button
-                type="button"
-                onClick={() => toggleElimination(question.id, choice.id)}
-                className={[
-                  'w-8 h-8 flex items-center justify-center rounded border text-sm transition-colors',
-                  isEliminated
-                    ? 'bg-red-100 border-red-300 text-red-600 hover:bg-red-200'
-                    : 'bg-gray-100 border-gray-300 text-gray-500 hover:bg-gray-200',
-                ].join(' ')}
-                title={isEliminated ? 'Un-eliminate' : 'Eliminate'}
-              >
-                ✕
-              </button>
-            </div>
-          )
-        })}
-      </div>
+            // Determine styles for the choice row
+            let rowClasses = 'flex-1 flex items-center gap-3 text-left px-4 py-3 rounded-lg border transition-colors'
+            if (isEliminated) {
+              rowClasses += ' bg-gray-100 border-gray-200 text-gray-400 line-through cursor-not-allowed'
+            } else if (isSelected) {
+              rowClasses += ' text-white border-transparent'
+            } else {
+              rowClasses += ' bg-white text-gray-800 border-gray-300 hover:bg-blue-50 hover:border-blue-300 cursor-pointer'
+            }
 
-      {/* mark for review */}
-      <label className="flex items-center gap-2 cursor-pointer select-none">
-        <input
-          type="checkbox"
-          checked={row?.marked_for_review ?? false}
-          onChange={() => toggleMarked(question.id)}
-          className="w-4 h-4 accent-blue-600"
-        />
-        <span className="text-sm text-gray-700">Mark for review</span>
-      </label>
+            // Radio circle styles
+            let radioClasses = 'w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors'
+            if (isEliminated) {
+              radioClasses += ' border-gray-300'
+            } else if (isSelected) {
+              radioClasses += ' border-white bg-white'
+            } else {
+              radioClasses += ' border-gray-400'
+            }
 
-      {/* prev / next — only in one-at-a-time and review modes */}
-      {viewMode !== 'all' && (
-        <div className="flex justify-between pt-3 border-t border-gray-200">
-          <button
-            type="button"
-            onClick={() => goTo(prevIndex())}
-            disabled={prevIndex() === currentIndex}
-            className="px-4 py-2 border rounded-lg text-sm disabled:opacity-30 hover:bg-gray-50 transition-colors"
-          >
-            Previous
-          </button>
-          <button
-            type="button"
-            onClick={() => goTo(nextIndex())}
-            disabled={nextIndex() === currentIndex}
-            className="px-4 py-2 border rounded-lg text-sm disabled:opacity-30 hover:bg-gray-50 transition-colors"
-          >
-            Next
-          </button>
+            return (
+              <div key={choice.id} className="flex items-center gap-2">
+                {/* full-width choice button */}
+                <button
+                  type="button"
+                  onClick={() => !isEliminated && selectAnswer(question.id, choice.id)}
+                  disabled={isEliminated}
+                  className={rowClasses}
+                  style={isSelected ? { backgroundColor: NAVY, borderColor: NAVY } : undefined}
+                >
+                  {/* radio circle */}
+                  <span className={radioClasses}>
+                    {isSelected && (
+                      <span
+                        className="w-2.5 h-2.5 rounded-full block"
+                        style={{ backgroundColor: NAVY }}
+                      />
+                    )}
+                  </span>
+
+                  {/* letter label */}
+                  <span className="font-semibold text-sm w-4 flex-shrink-0">
+                    {DISPLAY_LABELS[i]}.
+                  </span>
+
+                  {/* choice text */}
+                  <span className="text-sm">{choice.choice_text}</span>
+                </button>
+
+                {/* elimination toggle — subtle ✕ icon */}
+                <button
+                  type="button"
+                  onClick={() => toggleElimination(question.id, choice.id)}
+                  title={isEliminated ? 'Un-eliminate' : 'Eliminate this choice'}
+                  className={[
+                    'w-7 h-7 flex items-center justify-center rounded text-xs transition-colors flex-shrink-0',
+                    isEliminated
+                      ? 'bg-red-100 text-red-500 hover:bg-red-200'
+                      : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100',
+                  ].join(' ')}
+                >
+                  ✕
+                </button>
+              </div>
+            )
+          })}
         </div>
-      )}
+
+        {/* ── bottom row: mark for review + clear answer ───────────────────── */}
+        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={row?.marked_for_review ?? false}
+              onChange={() => toggleMarked(question.id)}
+              className="w-4 h-4 rounded"
+              style={{ accentColor: NAVY }}
+            />
+            <span className="text-sm text-gray-700">
+              I want to review this again before I submit
+            </span>
+          </label>
+
+          {/* clear answer button — only shown when a choice is selected */}
+          {row?.selected_choice_id && (
+            <button
+              type="button"
+              onClick={() => clearAnswer(question.id)}
+              className="text-xs text-gray-500 border border-gray-300 px-3 py-1.5 rounded hover:bg-gray-50 flex items-center gap-1.5 transition-colors flex-shrink-0 ml-4"
+            >
+              <span>⬆</span>
+              <span>Clear Answer</span>
+            </button>
+          )}
+        </div>
+
+        {/* ── prev / next — only in one-at-a-time and review modes ─────────── */}
+        {viewMode !== 'all' && (
+          <div className="flex justify-between pt-2 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={() => goTo(prevIndex())}
+              disabled={prevIndex() === currentIndex}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 disabled:opacity-30 hover:bg-gray-50 transition-colors"
+            >
+              ← Previous
+            </button>
+            <button
+              type="button"
+              onClick={() => goTo(nextIndex())}
+              disabled={nextIndex() === currentIndex}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 disabled:opacity-30 hover:bg-gray-50 transition-colors"
+            >
+              Next →
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Component
+// Main component
 // ---------------------------------------------------------------------------
 export default function TestShell() {
   const { id: attemptIdParam } = useParams<{ id: string }>()
@@ -201,7 +260,7 @@ export default function TestShell() {
   const [submitted, setSubmitted] = useState(false)
   const [score, setScore] = useState<{ score: number; total: number } | null>(null)
 
-  // ── phase 2 ────────────────────────────────────────────────────────────
+  // ── view mode ──────────────────────────────────────────────────────────
   const [viewMode, setViewMode] = useState<ViewMode>('one')
 
   // ── report issue modal ─────────────────────────────────────────────────
@@ -239,12 +298,11 @@ export default function TestShell() {
       setLoading(false)
       return
     }
-
     setAttemptId(attemptIdParam)
   }, [attemptIdParam])
 
   // ---------------------------------------------------------------------------
-  // Load test data after generation
+  // Load test data after attemptId is set
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!attemptId) return
@@ -260,7 +318,11 @@ export default function TestShell() {
         .eq('id', attemptId)
         .single()
 
-      if (attemptError) { setError('Failed to load test.'); setLoading(false); return }
+      if (attemptError) {
+        setError('Failed to load test.')
+        setLoading(false)
+        return
+      }
 
       // 2. Set started_at only if not already set (safe on refresh)
       if (!attemptRow.started_at) {
@@ -270,30 +332,38 @@ export default function TestShell() {
           .eq('id', attemptId)
       }
 
-      // 3. Set up timer if enabled
+      // 3. Configure timer if enabled
       if (attemptRow.use_timer && attemptRow.minutes) {
         setTimeRemaining(attemptRow.minutes * 60)
       }
 
-      // 4. Questions (ordered by position)
+      // 4. Questions ordered by position
       const { data: aqRows, error: aqErr } = await supabase
         .from('attempt_questions')
         .select('question_id, position, questions(id, question_text)')
         .eq('attempt_id', attemptId)
         .order('position')
 
-      if (aqErr) { setError('Failed to load questions.'); setLoading(false); return }
+      if (aqErr) {
+        setError('Failed to load questions.')
+        setLoading(false)
+        return
+      }
 
-      // 5. Answer choices (bulk fetch for all questions)
+      // 5. Answer choices — bulk fetch for all questions in one query
       const qIds = aqRows.map((r: any) => r.question_id)
       const { data: choiceRows, error: chErr } = await supabase
         .from('answer_choices')
         .select('id, question_id, choice_letter, choice_text')
         .in('question_id', qIds)
 
-      if (chErr) { setError('Failed to load choices.'); setLoading(false); return }
+      if (chErr) {
+        setError('Failed to load choices.')
+        setLoading(false)
+        return
+      }
 
-      // 6. Response rows — includes every field we need to hydrate
+      // 6. Response rows — every field needed to hydrate UI state
       const { data: respRows, error: respErr } = await supabase
         .from('question_responses')
         .select(
@@ -302,9 +372,13 @@ export default function TestShell() {
         )
         .eq('attempt_id', attemptId)
 
-      if (respErr) { setError('Failed to load responses.'); setLoading(false); return }
+      if (respErr) {
+        setError('Failed to load responses.')
+        setLoading(false)
+        return
+      }
 
-      // 7. Commit state
+      // 7. Commit all state atomically
       setQuestions(aqRows.map((r: any) => ({
         id: r.questions.id,
         question_text: r.questions.question_text,
@@ -314,7 +388,7 @@ export default function TestShell() {
       setResponses(respRows as ResponseRow[])
       setLoading(false)
 
-      // 8. Start timer after everything is visible
+      // 8. Start timer after data is visible
       if (attemptRow.use_timer && attemptRow.minutes) {
         setTimerActive(true)
       }
@@ -324,7 +398,7 @@ export default function TestShell() {
   }, [attemptId])
 
   // ---------------------------------------------------------------------------
-  // Timer countdown
+  // Timer countdown — ticks every second when active
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!timerActive || timeRemaining === null || submitted) return
@@ -336,10 +410,8 @@ export default function TestShell() {
   }, [timerActive, timeRemaining, submitted])
 
   // ---------------------------------------------------------------------------
-  // Autosave — 30 s interval. Pushes selected_choice_id, eliminated_choices,
-  // marked_for_review, and tab_switch_count for every row. selected_choice_id
-  // is also saved per-click, but the periodic flush is the safety net that
-  // fixes dropped writes (the NULL issue).
+  // Autosave — flush all response state to the DB every 30 seconds.
+  // The per-click saves on selectAnswer are the fast path; this is the safety net.
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!attemptId || loading || submitted) return
@@ -349,13 +421,14 @@ export default function TestShell() {
   }, [attemptId, loading, submitted])
 
   // ---------------------------------------------------------------------------
-  // Tab tracking — count tab-away events against whichever question is current
+  // Tab tracking — count how many times the user leaves the tab.
+  // Incremented against whichever question is currently active.
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!attemptId || loading || submitted) return
 
     function onVisibilityChange() {
-      if (!document.hidden) return // only count when leaving
+      if (!document.hidden) return // only count tab-away events
       const qId = questions[currentIndexRef.current]?.id
       if (!qId) return
       setResponses(prev =>
@@ -375,8 +448,8 @@ export default function TestShell() {
   // Persistence helpers
   // ---------------------------------------------------------------------------
 
-  // Push every response row to the DB in one sequential pass.
-  // Used by autosave interval and by the final flush before submit.
+  // Push every response row to the DB sequentially.
+  // Used by the autosave interval and by the final flush before submit.
   async function doSave() {
     if (!attemptId) return
     for (const r of responsesRef.current) {
@@ -394,23 +467,23 @@ export default function TestShell() {
   }
 
   // ---------------------------------------------------------------------------
-  // Answer selection
+  // Answer selection — optimistic update with rollback on error
   // ---------------------------------------------------------------------------
   async function selectAnswer(questionId: string, choiceId: string) {
     if (!attemptId || submitting || submitted) return
 
-    // Cannot select an eliminated choice
+    // Guard: cannot select an eliminated choice
     const row = responses.find(r => r.question_id === questionId)
     if (row?.eliminated_choices?.includes(choiceId)) return
 
     const previousChoiceId = row?.selected_choice_id ?? null
 
-    // Optimistic
+    // Optimistic UI update
     setResponses(prev =>
       prev.map(r => r.question_id === questionId ? { ...r, selected_choice_id: choiceId } : r)
     )
 
-    // Persist
+    // Persist to DB
     const { error } = await supabase
       .from('question_responses')
       .update({ selected_choice_id: choiceId })
@@ -418,11 +491,41 @@ export default function TestShell() {
       .eq('question_id', questionId)
 
     if (error) {
-      // Revert and surface — fixes the silent-NULL bug
+      // Rollback and surface the error
       setResponses(prev =>
         prev.map(r => r.question_id === questionId ? { ...r, selected_choice_id: previousChoiceId } : r)
       )
       setError('Failed to save answer. Please try again.')
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Clear answer — deselects the current answer for a question
+  // ---------------------------------------------------------------------------
+  async function clearAnswer(questionId: string) {
+    if (!attemptId || submitting || submitted) return
+
+    const row = responses.find(r => r.question_id === questionId)
+    const previousChoiceId = row?.selected_choice_id ?? null
+
+    // Optimistic UI update
+    setResponses(prev =>
+      prev.map(r => r.question_id === questionId ? { ...r, selected_choice_id: null } : r)
+    )
+
+    // Persist to DB
+    const { error } = await supabase
+      .from('question_responses')
+      .update({ selected_choice_id: null })
+      .eq('attempt_id', attemptId)
+      .eq('question_id', questionId)
+
+    if (error) {
+      // Rollback on failure
+      setResponses(prev =>
+        prev.map(r => r.question_id === questionId ? { ...r, selected_choice_id: previousChoiceId } : r)
+      )
+      setError('Failed to clear answer. Please try again.')
     }
   }
 
@@ -441,8 +544,7 @@ export default function TestShell() {
           ? r.eliminated_choices.filter(id => id !== choiceId)
           : [...r.eliminated_choices, choiceId]
 
-        // If we're eliminating (not un-eliminating) a choice that is currently
-        // selected, deselect it first.
+        // If we're eliminating a currently-selected choice, deselect it first
         const newSelected =
           !wasEliminated && r.selected_choice_id === choiceId
             ? null
@@ -452,8 +554,7 @@ export default function TestShell() {
       })
     )
 
-    // If we just deselected, persist that immediately so it doesn't rely
-    // solely on the next autosave tick.
+    // Persist the deselection immediately if we just knocked out the selected choice
     const row = responses.find(r => r.question_id === questionId)
     const wasEliminated = row?.eliminated_choices.includes(choiceId)
     if (!wasEliminated && row?.selected_choice_id === choiceId) {
@@ -482,7 +583,7 @@ export default function TestShell() {
     if (index >= 0 && index < questions.length) setCurrentIndex(index)
   }
 
-  // In review mode prev/next skip to the nearest marked question.
+  // In review mode, prev/next skip to the nearest marked question.
   function prevIndex(): number {
     if (viewMode === 'review') {
       for (let i = currentIndex - 1; i >= 0; i--) {
@@ -490,7 +591,7 @@ export default function TestShell() {
       }
       return currentIndex // no earlier marked question — stay put
     }
-    return currentIndex - 1
+    return Math.max(0, currentIndex - 1)
   }
 
   function nextIndex(): number {
@@ -500,11 +601,11 @@ export default function TestShell() {
       }
       return currentIndex
     }
-    return currentIndex + 1
+    return Math.min(questions.length - 1, currentIndex + 1)
   }
 
-  // When the user switches to review mode, snap currentIndex forward to the
-  // first marked question so prev/next don't start from an unmarked position.
+  // When switching to review mode, snap to the first marked question
+  // so prev/next don't start from an unmarked position.
   function switchViewMode(mode: ViewMode) {
     setViewMode(mode)
     if (mode === 'review') {
@@ -514,7 +615,7 @@ export default function TestShell() {
           return
         }
       }
-      // Nothing marked — index stays; the render path shows a message.
+      // Nothing marked — index stays; the render path shows a message
     }
   }
 
@@ -533,20 +634,22 @@ export default function TestShell() {
     setTimerActive(false)
 
     // Stop the autosave interval
-    if (autosaveRef.current) { clearInterval(autosaveRef.current); autosaveRef.current = null }
+    if (autosaveRef.current) {
+      clearInterval(autosaveRef.current)
+      autosaveRef.current = null
+    }
 
-    // Final flush — every row, every field, right now. This is the safety net
-    // that guarantees nothing is NULL at score time even if earlier writes dropped.
+    // Final flush — every row, every field, right now
     await doSave()
 
-    // Also write the total tab-switch count onto the attempt row
+    // Write total tab-switch count onto the attempt row
     const totalSwitches = responses.reduce((sum, r) => sum + r.tab_switch_count, 0)
     await supabase
       .from('test_attempts')
       .update({ out_of_browser_seconds: totalSwitches })
       .eq('id', attemptId)
 
-    // Score
+    // Score the attempt server-side
     const { data, error } = await supabase.rpc('submit_test', { p_attempt_id: attemptId })
     if (error) {
       setError(`Failed to submit: ${error.message}`)
@@ -563,11 +666,19 @@ export default function TestShell() {
   // Report Issue
   // ---------------------------------------------------------------------------
   function openReport(questionId: string) {
-    setReportState({ questionId, difficulty: null, quality: null, text: '', submitting: false, error: null })
+    setReportState({
+      questionId,
+      difficulty: null,
+      quality: null,
+      text: '',
+      submitting: false,
+      error: null,
+    })
   }
 
   async function submitReport() {
     if (!reportState.questionId || reportState.submitting) return
+
     if (reportState.difficulty === null && reportState.quality === null && !reportState.text.trim()) {
       setReportState(s => ({ ...s, error: 'Please fill in at least one field.' }))
       return
@@ -591,38 +702,43 @@ export default function TestShell() {
     }
 
     // Success — close modal
-    setReportState({ questionId: null, difficulty: null, quality: null, text: '', submitting: false, error: null })
+    setReportState({
+      questionId: null,
+      difficulty: null,
+      quality: null,
+      text: '',
+      submitting: false,
+      error: null,
+    })
   }
 
   // ---------------------------------------------------------------------------
-  // Formatting
+  // Formatting helpers
   // ---------------------------------------------------------------------------
-  function formatTime(secs: number) {
-    return `${Math.floor(secs / 60)}:${(secs % 60).toString().padStart(2, '0')}`
-  }
-
-  function timerClass() {
-    if (timeRemaining === null) return 'text-gray-700'
-    if (timeRemaining < 60)  return 'text-red-600 font-bold'
-    if (timeRemaining < 300) return 'text-yellow-600 font-semibold'
-    return 'text-gray-700'
+  function formatTime(secs: number): string {
+    const m = Math.floor(secs / 60)
+    const s = (secs % 60).toString().padStart(2, '0')
+    return `${m}:${s}`
   }
 
   // Palette button colour: yellow if marked, green if answered, else gray.
   // Yellow takes priority over green so marked-and-answered reads as "needs review".
-  function paletteClass(questionId: string) {
+  function paletteClass(questionId: string): string {
     const r = responses.find(row => row.question_id === questionId)
-    if (r?.marked_for_review)     return 'bg-yellow-400 text-black'
-    if (r?.selected_choice_id)    return 'bg-green-500 text-white'
+    if (r?.marked_for_review) return 'bg-yellow-400 text-black'
+    if (r?.selected_choice_id) return 'bg-green-500 text-white'
     return 'bg-gray-200 text-gray-700'
   }
 
-  // Props to pass to QuestionCard
+  // Props forwarded to every QuestionCard
   const cardProps = {
     responses, choices, questions, viewMode, currentIndex,
-    selectAnswer, toggleElimination, toggleMarked, openReport,
-    goTo, prevIndex, nextIndex
+    selectAnswer, clearAnswer, toggleElimination, toggleMarked,
+    openReport, goTo, prevIndex, nextIndex,
   }
+
+  // Derived: does any question have marked_for_review = true?
+  const anyMarked = responses.some(r => r.marked_for_review)
 
   // ---------------------------------------------------------------------------
   // Early-return screens
@@ -641,7 +757,12 @@ export default function TestShell() {
         <div className="bg-white p-8 rounded-xl shadow max-w-md">
           <h2 className="text-xl font-bold text-red-600 mb-4">Error</h2>
           <p className="text-gray-700">{error}</p>
-          <button type="button" onClick={() => navigate('/')} className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg">
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="mt-4 text-white px-4 py-2 rounded-lg"
+            style={{ backgroundColor: NAVY }}
+          >
             Back to Dashboard
           </button>
         </div>
@@ -654,22 +775,25 @@ export default function TestShell() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="bg-white p-8 rounded-xl shadow max-w-md w-full text-center space-y-4">
           <h2 className="text-2xl font-bold">Test Complete!</h2>
-          <p className="text-5xl font-bold text-blue-600">{score.score} / {score.total}</p>
+          <p className="text-5xl font-bold" style={{ color: NAVY }}>
+            {score.score} / {score.total}
+          </p>
           <p className="text-lg text-gray-600">
             {score.total > 0 ? Math.round((score.score / score.total) * 100) : 0}%
           </p>
           <div className="flex flex-col gap-2 pt-4">
-            <button 
-              type="button" 
-              onClick={() => navigate(`/results/${attemptId}`)} 
-              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-medium"
+            <button
+              type="button"
+              onClick={() => navigate(`/results/${attemptId}`)}
+              className="text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
+              style={{ backgroundColor: NAVY }}
             >
               View Detailed Results
             </button>
-            <button 
-              type="button" 
-              onClick={() => navigate('/')} 
-              className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700"
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors"
             >
               Back to Dashboard
             </button>
@@ -688,79 +812,95 @@ export default function TestShell() {
   }
 
   // ---------------------------------------------------------------------------
-  // Determine what the "review" body shows.
-  // If nothing is marked, show a message instead of crashing on an empty card.
-  // ---------------------------------------------------------------------------
-  const anyMarked = responses.some(r => r.marked_for_review)
-
-  // ---------------------------------------------------------------------------
   // Main render
   // ---------------------------------------------------------------------------
   return (
     <div className="min-h-screen bg-blue-600 flex flex-col">
-      {/* ── header ───────────────────────────────────────────────────────── */}
-      <header className="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
-        <h1 className="text-lg font-semibold text-gray-800">Practice Test</h1>
-        <div className="flex items-center gap-4">
-          {/* view-mode dropdown */}
+
+      {/* ── header ─────────────────────────────────────────────────────────── */}
+      <header
+        className="px-6 py-4 flex justify-between items-center shadow-md"
+        style={{ backgroundColor: NAVY }}
+      >
+        {/* left: test title */}
+        <h1 className="text-white font-semibold text-base">Practice Test</h1>
+
+        {/* center: timer (only when enabled) */}
+        {timeRemaining !== null && (
+          <div className="flex flex-col items-center">
+            <span className={[
+              'text-xl font-bold tabular-nums',
+              timeRemaining < 60   ? 'text-red-400'
+              : timeRemaining < 300  ? 'text-yellow-300'
+              : 'text-white',
+            ].join(' ')}>
+              {formatTime(timeRemaining)}
+            </span>
+            <span className="text-blue-300 text-xs tracking-wide">Remaining</span>
+          </div>
+        )}
+
+        {/* right: view-mode dropdown + submit */}
+        <div className="flex items-center gap-3">
           <select
             value={viewMode}
             onChange={e => switchViewMode(e.target.value as ViewMode)}
-            className="border border-gray-300 px-2 py-1.5 rounded-lg text-sm bg-white"
+            className="bg-white text-gray-800 border-0 px-3 py-1.5 rounded-lg text-sm font-medium cursor-pointer"
           >
             <option value="one">One at a Time</option>
             <option value="all">All Questions</option>
             <option value="review">Review Only</option>
           </select>
 
-          {/* timer */}
-          {timeRemaining !== null && (
-            <span className={`text-lg ${timerClass()}`}>{formatTime(timeRemaining)}</span>
-          )}
-
-          {/* submit */}
           <button
             type="button"
             onClick={handleSubmit}
             disabled={submitting}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+            className="bg-white font-semibold px-4 py-1.5 rounded-lg text-sm hover:bg-blue-50 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+            style={{ color: NAVY }}
           >
-            {submitting ? 'Submitting…' : 'Submit Test'}
+            {submitting ? 'Submitting…' : '✈ Submit'}
           </button>
         </div>
       </header>
 
-      {/* ── question area ─────────────────────────────────────────────────── */}
+      {/* ── question area ───────────────────────────────────────────────────── */}
       <main className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-2xl mx-auto space-y-6">
+        <div className="max-w-3xl mx-auto space-y-6">
+
+          {/* one-at-a-time mode */}
           {viewMode === 'one' && questions[currentIndex] && (
             <QuestionCard question={questions[currentIndex]} {...cardProps} />
           )}
 
+          {/* all-questions mode */}
           {viewMode === 'all' && questions.map(q => (
             <QuestionCard key={q.id} question={q} {...cardProps} />
           ))}
 
+          {/* review-only mode */}
           {viewMode === 'review' && (
             anyMarked
               ? <QuestionCard question={questions[currentIndex]} {...cardProps} />
-              : <div className="bg-white rounded-xl shadow-lg p-8 text-center space-y-2">
+              : (
+                <div className="bg-white rounded-xl shadow-lg p-8 text-center space-y-2">
                   <p className="text-gray-700 font-medium">No questions marked for review.</p>
                   <p className="text-sm text-gray-400">
-                    Switch to another view and check "Mark for review" on questions you want to revisit.
+                    Switch to another view and check "I want to review this again" on questions you want to revisit.
                   </p>
                 </div>
+              )
           )}
         </div>
       </main>
 
-      {/* ── question palette (always visible) ────────────────────────────── */}
+      {/* ── question palette (always visible) ───────────────────────────────── */}
       <footer className="bg-white border-t border-gray-200 px-6 py-3">
-        <div className="max-w-2xl mx-auto flex flex-wrap gap-2">
+        <div className="max-w-3xl mx-auto flex flex-wrap gap-2">
           {questions.map((q, i) => {
             const isCurrentInSingleView = i === currentIndex && viewMode !== 'all'
             const isMarked = responses.find(r => r.question_id === q.id)?.marked_for_review
-            // In review mode, greyed-out buttons for unmarked questions are not clickable.
+            // In review mode, unmarked questions are not navigable
             const blocked = viewMode === 'review' && !isMarked
 
             return (
@@ -777,9 +917,9 @@ export default function TestShell() {
                 className={[
                   'w-9 h-9 rounded-lg text-sm font-semibold border-2 transition-colors',
                   paletteClass(q.id),
-                  isCurrentInSingleView ? 'border-blue-600' : 'border-transparent',
                   blocked ? 'opacity-35 cursor-not-allowed' : 'cursor-pointer hover:opacity-80',
                 ].join(' ')}
+                style={isCurrentInSingleView ? { borderColor: NAVY } : { borderColor: 'transparent' }}
                 title={`Question ${i + 1}`}
               >
                 {i + 1}
@@ -789,27 +929,34 @@ export default function TestShell() {
         </div>
       </footer>
 
-      {/* ── report-issue modal ────────────────────────────────────────────── */}
+      {/* ── report-issue modal ──────────────────────────────────────────────── */}
       {reportState.questionId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6 space-y-4">
-            {/* header */}
+
+            {/* modal header */}
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-bold text-gray-900">Report an Issue</h3>
               <button
                 type="button"
                 onClick={() => setReportState(s => ({ ...s, questionId: null }))}
                 className="text-gray-400 hover:text-gray-700 text-xl leading-none"
-              >✕</button>
+              >
+                ✕
+              </button>
             </div>
 
-            {reportState.error && <p className="text-red-600 text-sm">{reportState.error}</p>}
+            {reportState.error && (
+              <p className="text-red-600 text-sm">{reportState.error}</p>
+            )}
 
-            {/* difficulty */}
+            {/* difficulty rating */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Difficulty (1–5)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Difficulty (1–5)
+              </label>
               <div className="flex gap-2">
-                {[1,2,3,4,5].map(n => (
+                {[1, 2, 3, 4, 5].map(n => (
                   <button
                     key={n}
                     type="button"
@@ -817,19 +964,24 @@ export default function TestShell() {
                     className={[
                       'w-9 h-9 rounded-lg border text-sm font-semibold transition-colors',
                       reportState.difficulty === n
-                        ? 'bg-blue-600 text-white border-blue-600'
+                        ? 'text-white border-transparent'
                         : 'border-gray-300 hover:bg-gray-100',
                     ].join(' ')}
-                  >{n}</button>
+                    style={reportState.difficulty === n ? { backgroundColor: NAVY } : undefined}
+                  >
+                    {n}
+                  </button>
                 ))}
               </div>
             </div>
 
-            {/* quality */}
+            {/* quality rating */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Quality (1–5)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Quality (1–5)
+              </label>
               <div className="flex gap-2">
-                {[1,2,3,4,5].map(n => (
+                {[1, 2, 3, 4, 5].map(n => (
                   <button
                     key={n}
                     type="button"
@@ -837,23 +989,29 @@ export default function TestShell() {
                     className={[
                       'w-9 h-9 rounded-lg border text-sm font-semibold transition-colors',
                       reportState.quality === n
-                        ? 'bg-blue-600 text-white border-blue-600'
+                        ? 'text-white border-transparent'
                         : 'border-gray-300 hover:bg-gray-100',
                     ].join(' ')}
-                  >{n}</button>
+                    style={reportState.quality === n ? { backgroundColor: NAVY } : undefined}
+                  >
+                    {n}
+                  </button>
                 ))}
               </div>
             </div>
 
             {/* comments */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Comments (optional)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Comments (optional)
+              </label>
               <textarea
                 value={reportState.text}
                 onChange={e => setReportState(s => ({ ...s, text: e.target.value }))}
                 rows={3}
                 placeholder="Describe the issue…"
-                className="border border-gray-300 px-3 py-2 w-full rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="border border-gray-300 px-3 py-2 w-full rounded-lg text-sm resize-none focus:outline-none focus:ring-2"
+                style={{ '--tw-ring-color': NAVY } as React.CSSProperties}
               />
             </div>
 
@@ -863,13 +1021,18 @@ export default function TestShell() {
                 type="button"
                 onClick={() => setReportState(s => ({ ...s, questionId: null }))}
                 className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors"
-              >Cancel</button>
+              >
+                Cancel
+              </button>
               <button
                 type="button"
                 onClick={submitReport}
                 disabled={reportState.submitting}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50 transition-colors"
-              >{reportState.submitting ? 'Sending…' : 'Submit'}</button>
+                className="text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50 hover:opacity-90 transition-opacity"
+                style={{ backgroundColor: NAVY }}
+              >
+                {reportState.submitting ? 'Sending…' : 'Submit'}
+              </button>
             </div>
           </div>
         </div>
