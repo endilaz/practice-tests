@@ -1,0 +1,139 @@
+{
+  "topic": "Accounting Fundamentals",
+  "questions": [
+    {
+      "question_text": "What is the fundamental accounting equation?",
+      "difficulty_level": 1,
+      "explanation_text": "The accounting equation (Assets = Liabilities + Equity) is the foundation of double-entry bookkeeping. It must always balance because every transaction affects at least two accounts.",
+      "answer_choices": [
+        {
+          "letter": "A",
+          "text": "Assets = Liabilities + Equity",
+          "is_correct": true
+        },
+        {
+          "letter": "B",
+          "text": "Assets = Liabilities - Equity",
+          "is_correct": false
+        },
+        {
+          "letter": "C",
+          "text": "Assets + Liabilities = Equity",
+          "is_correct": false
+        },
+        {
+          "letter": "D",
+          "text": "Assets = Revenue - Expenses",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "question_text": "Which financial statement shows a company's financial position at a specific point in time?",
+      "difficulty_level": 2,
+      "explanation_text": "The balance sheet is a snapshot of a company's financial position at a specific date, showing what the company owns (assets), owes (liabilities), and the owners' stake (equity).",
+      "answer_choices": [
+        {
+          "letter": "A",
+          "text": "Income Statement",
+          "is_correct": false
+        },
+        {
+          "letter": "B",
+          "text": "Balance Sheet",
+          "is_correct": true
+        },
+        {
+          "letter": "C",
+          "text": "Cash Flow Statement",
+          "is_correct": false
+        },
+        {
+          "letter": "D",
+          "text": "Statement of Retained Earnings",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "question_text": "What accounting principle requires expenses to be recorded in the same period as the revenues they help generate?",
+      "difficulty_level": 3,
+      "explanation_text": "The matching principle ensures that expenses are matched with the revenues they helped produce, providing a more accurate picture of profitability in each accounting period.",
+      "answer_choices": [
+        {
+          "letter": "A",
+          "text": "Revenue Recognition Principle",
+          "is_correct": false
+        },
+        {
+          "letter": "B",
+          "text": "Matching Principle",
+          "is_correct": true
+        },
+        {
+          "letter": "C",
+          "text": "Cost Principle",
+          "is_correct": false
+        },
+        {
+          "letter": "D",
+          "text": "Consistency Principle",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "question_text": "A company purchases inventory on credit for $5,000. How does this transaction affect the accounting equation?",
+      "difficulty_level": 3,
+      "answer_choices": [
+        {
+          "letter": "A",
+          "text": "Assets increase by $5,000, Equity increases by $5,000",
+          "is_correct": false
+        },
+        {
+          "letter": "B",
+          "text": "Assets increase by $5,000, Liabilities increase by $5,000",
+          "is_correct": true
+        },
+        {
+          "letter": "C",
+          "text": "Assets decrease by $5,000, Liabilities increase by $5,000",
+          "is_correct": false
+        },
+        {
+          "letter": "D",
+          "text": "No effect on the accounting equation",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "question_text": "What is the normal balance of a liability account?",
+      "difficulty_level": 1,
+      "explanation_text": "Liability accounts normally have credit balances. When a company incurs a debt, the liability account is credited (increased). When the debt is paid, the liability account is debited (decreased).",
+      "answer_choices": [
+        {
+          "letter": "A",
+          "text": "Debit",
+          "is_correct": false
+        },
+        {
+          "letter": "B",
+          "text": "Credit",
+          "is_correct": true
+        },
+        {
+          "letter": "C",
+          "text": "Zero",
+          "is_correct": false
+        },
+        {
+          "letter": "D",
+          "text": "It depends on the type of liability",
+          "is_correct": false
+        }
+      ]
+    }
+  ]
+}
