@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import { testConfigSchema } from './test.schema'
+import { useAuth } from '@/auth/useAuth'
 
 type Topic = {
   id: string
@@ -9,6 +10,8 @@ type Topic = {
 }
 
 export function TestConfigForm() {
+  const { role, loading: authLoading } = useAuth()
+
   const [topics, setTopics] = useState<Topic[]>([])
   const [topicId, setTopicId] = useState('')
   const [questionCount, setQuestionCount] = useState('25')
@@ -22,9 +25,11 @@ export function TestConfigForm() {
 
   const navigate = useNavigate()
 
+  // Wait for auth to settle before loading topics so the role-based
+  // [DEBUG] filter has the correct value on first load.
   useEffect(() => {
-    loadTopics()
-  }, [])
+    if (!authLoading) loadTopics()
+  }, [authLoading])
 
   // Fetch available question count when topic changes
   useEffect(() => {
@@ -44,7 +49,14 @@ export function TestConfigForm() {
     if (error) {
       setError(error.message)
     } else {
-      setTopics(data)
+      // Hide [DEBUG] topics from non-admins (client-side cosmetic filter;
+      // no security boundary — RLS already allows all authenticated users
+      // to read topics, so this only affects what appears in the selector).
+      const filtered =
+        role === 'admin'
+          ? data
+          : data.filter(t => !t.name.startsWith('[DEBUG]'))
+      setTopics(filtered)
     }
     setLoading(false)
   }
@@ -185,8 +197,8 @@ export function TestConfigForm() {
           disabled={submitting}
         />
         <p className="text-xs text-gray-500 mt-1">
-          {practiceMode 
-            ? 'Enter 0 for infinite practice mode' 
+          {practiceMode
+            ? 'Enter 0 for infinite practice mode'
             : 'Maximum 100 questions per test'}
         </p>
       </div>
