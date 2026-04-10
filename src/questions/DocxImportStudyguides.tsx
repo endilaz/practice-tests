@@ -115,7 +115,7 @@ async function extractPdfText(buffer: ArrayBuffer): Promise<string[]> {
     // Group by Y (round to nearest 2px to handle slight vertical misalignment)
     const byY = new Map<number, Item[]>()
     for (const item of items) {
-      const yKey = Math.round(item.y / 2) * 2
+      const yKey = Math.round(item.y / 4) * 4
       if (!byY.has(yKey)) byY.set(yKey, [])
       byY.get(yKey)!.push(item)
     }
@@ -134,6 +134,47 @@ async function extractPdfText(buffer: ArrayBuffer): Promise<string[]> {
 }
 
 /**
+ * Match an "X Answer Key" header line, tolerating OCR-introduced spaces
+ * anywhere in the line — including inside the topic name itself.
+ * e.g. "Introduction to Parliamentary Pr ocedure Answer Key"
+ *      "Introduction to Business Answe r Key"
+ *
+ * Strategy:
+ *   1. Collapse ALL whitespace and check if the result ends with "answerkey".
+ *   2. If so, walk backwards through the original line consuming the characters
+ *      of "answerkey" (skipping spaces), then return whatever precedes that
+ *      suffix as the topic name (trimmed).
+ *
+ * Returns the topic name portion (original spacing preserved, trimmed), or null.
+ */
+function matchAnswerKeyHeader(line: string): string | null {
+  // Fast path: normal well-formed header
+  const direct = line.match(/^(.+?)\s+answer\s+key$/i)
+  if (direct) return direct[1].trim()
+
+  // Slow path: collapse and check, then recover topic name from original
+  const collapsed = line.replace(/\s+/g, '')
+  if (!/^.+answerkey$/i.test(collapsed)) return null
+
+  // Walk backwards through `line`, matching "answerkey" right-to-left,
+  // skipping any spaces we encounter.
+  const target = 'answerkey'   // 9 chars
+  let ti = target.length - 1   // index into target (right-to-left)
+  let li = line.length - 1     // index into original line
+
+  while (li >= 0 && ti >= 0) {
+    const ch = line[li].toLowerCase()
+    if (ch === ' ') { li--; continue }         // skip spaces in original
+    if (ch === target[ti]) { ti--; li-- }      // matched next target char
+    else break                                 // mismatch — shouldn't happen after collapsed check
+  }
+
+  // Everything before position li+1 is the topic name
+  const topicPart = line.slice(0, li + 1).trim()
+  return topicPart.length > 0 ? topicPart : null
+}
+
+/**
  * Parse answer keys from plain text lines (PDF format).
  *
  * In PDFs, answer keys are plain paragraphs — no Word tables.
@@ -146,20 +187,109 @@ function parseAnswerKeysFromLines(
 ): Map<string, Record<number, ChoiceLetter>> {
   const keys = new Map<string, Record<number, ChoiceLetter>>()
   // Global: handles multi-column merged rows, space-optional after paren
-  const entryRe = /(\d+)\)\s*([A-D])(?=[\s,]|$)/gi
-  const headerRe = /^(.+?)\s+answer\s+key$/i
+  // Paren may be a literal ")" or an OCR-misread glyph (Y, l, j, etc.).
+  // A fully missing paren (fix 1) is also accepted when the number is
+  // preceded by a word boundary so we don't match arbitrary numbers in text.
+  // const entryRe = /(?<!\d)(\d+)[)Ylj]?\s*([A-D])(?=[\s,]|$)/gi
+  // const headerRe = /^(.+?)\s+answer\s+key$/i
+  // headerRe removed — replaced by matchAnswerKeyHeader() helper
 
-  // Pre-process: merge orphan "N)" lines with the following line.
-  // PDF extraction sometimes splits "10)" and "A" onto separate lines.
+  // Pre-process orphan "N)" lines — two cases:
+  //
+  // Case A (forward): orphan is followed by a line that starts with [A-D].
+  //   e.g. "6)\nB 16) C 26) B" → "6) B 16) C 26) B"
+  //   The orphan number's answer is the letter at the start of the next line.
+  //
+  // Case B (backward): orphan follows a line that already contains answer entries,
+  //   meaning the PDF printed the number on the next line after its answer letter.
+  //   e.g. "C 20) D 30) D\n10)" → the orphan 10 belongs BEFORE 20 on the prev line.
+  //   We find 10's answer (the "C" that precedes "20)") and insert "10) C" in
+  //   sorted order so the line becomes "10) C 20) D 30) D".
+
+  // Regex for a bare orphan line: just a number and optional misread paren
+  const ORPHAN_RE = /^\d+[)Ylj]?\s*$/
+
+  // First pass — Case A
   const merged: string[] = []
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i].trim()
-    if (/^\d+\s*\)$/.test(trimmed) && i + 1 < lines.length) {
-      merged.push(trimmed + ' ' + lines[i + 1].trim())
-      i++
+    const nextLine = i + 1 < lines.length ? lines[i + 1].trim() : ''
+
+    if (ORPHAN_RE.test(trimmed) && /^[A-D](?:\s|$)/i.test(nextLine)) {
+      // Normalise the paren while merging
+      merged.push(trimmed.replace(/[Ylj]/, ')') + ' ' + nextLine)
+      i++ // consume next line
     } else {
       merged.push(trimmed)
     }
+  }
+
+  // Second pass — Case B (iterate backwards so splices don't shift indices)
+  // Inline entry scanner used for both finding and rebuilding
+  const ENTRY_SCAN_RE = /(?<!\d)(\d+)[)Ylj]?\s*([A-D])(?=[\s,]|$)/gi
+
+  for (let i = merged.length - 1; i > 0; i--) {
+    const line = merged[i].trim()
+    if (!ORPHAN_RE.test(line)) continue
+
+    const orphanNum = parseInt(line.match(/\d+/)![0])
+    const prevLine = merged[i - 1].trim()
+
+    // Extract all (number → letter) entries from the previous line in text order
+    type Entry = { num: number; letter: string; raw: string; index: number }
+    const prevEntries: Entry[] = []
+    for (const em of prevLine.matchAll(ENTRY_SCAN_RE)) {
+      prevEntries.push({
+        num: parseInt(em[1]),
+        letter: em[2].toUpperCase(),
+        raw: em[0].trim(),
+        index: em.index ?? 0,
+      })
+    }
+
+    // Previous line must have at least one entry to be an answer-key line
+    if (prevEntries.length === 0) continue
+
+    // Find the orphan's answer letter: it's the letter that immediately precedes
+    // the first entry whose number is greater than orphanNum.
+    // e.g. prevLine = "C 20) D 30) D", orphanNum=10
+    //   → nextHigher=20, text before "20) D" is "C " → orphanLetter = "C"
+    let orphanLetter: string | null = null
+    const sortedByNum = [...prevEntries].sort((a, b) => a.num - b.num)
+    const nextHigherEntry = sortedByNum.find(e => e.num > orphanNum)
+
+    if (nextHigherEntry) {
+      // Scan backwards from just before nextHigherEntry for a bare letter
+      const before = prevLine.slice(0, nextHigherEntry.index)
+      const lm = before.match(/([A-D])\s*$/i)
+      if (lm) orphanLetter = lm[1].toUpperCase()
+    } else {
+      // orphanNum > all existing entries — its answer is after the last entry
+      const lastEntry = prevEntries[prevEntries.length - 1]
+      const afterIdx = lastEntry.index + lastEntry.raw.length
+      const after = prevLine.slice(afterIdx)
+      const lm = after.match(/^\s*([A-D])/i)
+      if (lm) orphanLetter = lm[1].toUpperCase()
+    }
+
+    if (!orphanLetter) continue // can't determine answer — leave as-is
+
+    // Rebuild previous line with orphan inserted at its sorted position
+    const orphanToken = `${orphanNum}) ${orphanLetter}`
+    const insertBefore = prevEntries.find(e => e.num > orphanNum)
+    let newPrevLine: string
+    if (insertBefore) {
+      newPrevLine = (
+        prevLine.slice(0, insertBefore.index) +
+        orphanToken + ' ' +
+        prevLine.slice(insertBefore.index)
+      ).trim()
+    } else {
+      newPrevLine = (prevLine + ' ' + orphanToken).trim()
+    }
+
+    merged[i - 1] = newPrevLine
+    merged.splice(i, 1) // remove consumed orphan line
   }
 
   let currentKey: string | null = null
@@ -174,13 +304,16 @@ function parseAnswerKeysFromLines(
       continue
     }
 
-    const hm = trimmed.match(headerRe)
-    if (hm) {
+    const topicPart = matchAnswerKeyHeader(trimmed)
+    if (topicPart) {
       if (currentKey && Object.keys(currentEntries).length > 0) {
         keys.set(currentKey, currentEntries)
+        // Also store under fully space-collapsed key so that OCR spaces inside
+        // the topic name (e.g. "Intr oduction to...") don't break fuzzy lookup
+        keys.set(normaliseTopicNameFuzzy(currentKey), currentEntries)
       }
       inAnswerSection = true
-      currentKey = normaliseTopicName(hm[1])
+      currentKey = normaliseTopicName(topicPart)
       currentEntries = {}
       continue
     }
@@ -189,14 +322,15 @@ function parseAnswerKeysFromLines(
 
     // Normalize "30 )" -> "30)" before matching
     const normalised = trimmed.replace(/(\d+)\s+\)/g, '$1)')
-    entryRe.lastIndex = 0
-    for (const em of normalised.matchAll(entryRe)) {
+    for (const em of normalised.matchAll(/(?<!\d)(\d+)[)Ylj]?\s*([A-D])(?=[\s,]|$)/gi)) {
       currentEntries[parseInt(em[1])] = em[2].toUpperCase() as ChoiceLetter
     }
   }
 
   if (currentKey && Object.keys(currentEntries).length > 0) {
+    // Store under fuzzy key too for PDF mid-word-split recovery
     keys.set(currentKey, currentEntries)
+    keys.set(normaliseTopicNameFuzzy(currentKey), currentEntries)
   }
 
   return keys
@@ -283,8 +417,8 @@ function parseAnswerKeys(
   const keys = new Map<string, Record<number, ChoiceLetter>>()
   const NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
 
-  const entryRe = /^(\d+)\)\s+([A-D])$/i
-  const headerRe = /^(.+?)\s+answer\s+key$/i
+  const entryRe = /^(\d+)[)Ylj]?\s*([A-D])$/i
+  // headerRe replaced by matchAnswerKeyHeader() for OCR-space tolerance
 
   // Walk the document body's direct children in document order.
   // Each answer key topic has: a <w:p> header paragraph followed immediately
@@ -316,10 +450,10 @@ function parseAnswerKeys(
         continue
       }
 
-      const m = text.match(headerRe)
-      if (m) {
+      const topicPart = matchAnswerKeyHeader(text)
+      if (topicPart) {
         inAnswerKeySection = true   // also works for 2010-13 with no sentinel
-        pendingTopicKey = normaliseTopicName(m[1])
+        pendingTopicKey = normaliseTopicName(topicPart)
       }
 
     } else if (localName === 'tbl' && inAnswerKeySection && pendingTopicKey) {
@@ -336,7 +470,11 @@ function parseAnswerKeys(
         if (em) entries[parseInt(em[1])] = em[2].toUpperCase() as ChoiceLetter
       }
 
-      if (Object.keys(entries).length > 0) keys.set(pendingTopicKey, entries)
+      if (Object.keys(entries).length > 0) {
+        keys.set(pendingTopicKey, entries)
+        // Also store under space-collapsed key for OCR-space topic name tolerance
+        keys.set(normaliseTopicNameFuzzy(pendingTopicKey), entries)
+      }
       pendingTopicKey = null  // consume — next header sets a new one
     }
   }
@@ -408,10 +546,12 @@ function parseTopicBlocks(
   // Parse each segment into questions
   for (const seg of segments) {
     const fmt = detectFormat(seg.lines)
-    const answerKey = answerKeys.get(seg.normName) ?? {}
+    const answerKey = answerKeys.get(seg.normName)
+      ?? answerKeys.get(normaliseTopicNameFuzzy(seg.normName))
+      ?? {}
 
     if (Object.keys(answerKey).length === 0) {
-      issues.push(`No answer key found for topic "${seg.displayName}" (normalised: "${seg.normName}")`)
+      issues.push(`No answer key found for topic "${seg.displayName}"`)      
     }
 
     const questions = parseQuestionsFromLines(seg.lines, answerKey, fmt, seg.displayName, issues)
@@ -446,11 +586,12 @@ function parseQuestionsFromLines(
     : /^(\d+)\.\s*(.*)/
 
   // Choice pattern differs by format
-  // 2017: "A) choice text" (uppercase)
-  // 2010: "a. choice text" (lowercase) — but normalise to uppercase
+  // 2017: "A) choice text" (uppercase) — space after paren required
+  // 2010: "a. choice text" or "a.choice text" (lowercase, space optional after dot)
+  //       Both forms occur in practice, especially when PDF merges items onto one line.
   const choiceRe = fmt === '2017'
     ? /^([A-D])\)\s+(.*)/i
-    : /^([A-Da-d])\.\s+(.*)/
+    : /^([A-Da-d])\.\s*(.*)/    // \s* — space after dot is optional
 
   // Clean lines: remove junk, skip empty
   const cleaned = lines
@@ -473,13 +614,13 @@ function parseQuestionsFromLines(
     i++
 
     // Handle edge case: first choice on same line as question number (2010 format edge case)
-    // e.g. "5. Barriers... a. listening" — split at the choice marker
+    // e.g. "5. Barriers... a. listening" or "5. Question text a.ROM b.virtual PC"
+    // Split at the first choice marker — space after dot is optional.
     if (fmt === '2010') {
-      const inlineChoiceIdx = questionText.search(/\s+[a-d]\.\s/)
+      const inlineChoiceIdx = questionText.search(/\s+[a-d]\.\s*/i)
       if (inlineChoiceIdx !== -1) {
         const rest = questionText.slice(inlineChoiceIdx).trim()
         questionText = questionText.slice(0, inlineChoiceIdx).trim()
-        // Push the inline choice back as the next line to process
         cleaned.splice(i, 0, rest)
       }
     }
@@ -543,15 +684,14 @@ function parseQuestionsFromLines(
       }
 
       // Check for inline next-choice marker within the accumulated text.
-      // e.g. "non-persistent...remission  d. persistent..." in 2010 format.
-      // The inline choice must be a different letter than the current one.
+      // e.g. "non-persistent...remission  d. persistent..." or "ROM b.virtual PC"
+      // Space after dot is optional; require at least one space before the letter.
       if (fmt === '2010') {
-        const inlineNextChoice = /\s{2,}([b-d])\.\s+/i
+        const inlineNextChoice = /\s+([b-d])\.\s*/i
         const inlineIdx = choiceText.search(inlineNextChoice)
         if (inlineIdx !== -1) {
           const rest = choiceText.slice(inlineIdx).trim()
           choiceText = choiceText.slice(0, inlineIdx).trim()
-          // Splice the inline next choice back as a line to process
           cleaned.splice(i, 0, rest)
         }
       }
@@ -608,9 +748,17 @@ function isJunkLine(line: string): boolean {
   return JUNK_LINE_PATTERNS.some(re => re.test(t))
 }
 
-/** Normalise a topic name for fuzzy matching: lowercase, collapse whitespace, trim. */
+/** Normalise a topic name: lowercase, collapse whitespace, trim. */
 function normaliseTopicName(name: string): string {
   return name.toLowerCase().replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * Fuzzy-normalise: remove ALL spaces. Fallback for PDF mid-word splits
+ * e.g. "Pr ocedure" -> "procedure" matches "procedure".
+ */
+function normaliseTopicNameFuzzy(name: string): string {
+  return name.toLowerCase().replace(/\s+/g, '')
 }
 
 function toTitleCase(str: string): string {
@@ -673,6 +821,14 @@ export function DocxImportFBLA() {
   // Whether to override and skip unanswered questions per topic
   const [overridePartial, setOverridePartial] = useState<Set<string>>(new Set())
 
+  // In-memory question edits: shadows parseResult.topics[].questions per topic.
+  // Populated lazily when the user first opens a topic's editor panel.
+  // Stored as a full ParsedQuestion[] copy so deletes and field edits are independent
+  // of the original parse result (which is never mutated).
+  const [editedQuestions, setEditedQuestions] = useState<Record<string, ParsedQuestion[]>>({})
+  // Which topics currently have their editor panel expanded
+  const [expandedEditors, setExpandedEditors] = useState<Set<string>>(new Set())
+
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<{ count: number; topicCount: number } | null>(null)
   const [importErrors, setImportErrors] = useState<string[]>([])
@@ -682,8 +838,14 @@ export function DocxImportFBLA() {
   // Scroll page to top whenever the step changes.
   // Use window.scrollTo rather than scrollIntoView — the latter targets the
   // nearest scrollable ancestor which may be the chat container, not the page.
+  // Scroll to top on step change. Try all scroll targets since the
+  // container varies by environment (window, documentElement, ancestors).
   useEffect(() => {
-    const timer = setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50)
+    const timer = setTimeout(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' })
+      }
+    }, 80)
     return () => clearTimeout(timer)
   }, [step])
 
@@ -695,6 +857,8 @@ export function DocxImportFBLA() {
     setSelectedTopics(new Set())
     setTopicNames({})
     setOverridePartial(new Set())
+    setEditedQuestions({})
+    setExpandedEditors(new Set())
     setError(null)
     setSuccess(null)
     setImportErrors([])
@@ -775,6 +939,89 @@ export function DocxImportFBLA() {
     })
   }
 
+  // --- Editor helpers ---
+
+  /**
+   * Returns the live (possibly edited) question list for a topic.
+   * Falls back to the original parsed questions if no edits have been made.
+   */
+  function liveQuestions(normName: string): ParsedQuestion[] {
+    return (
+      editedQuestions[normName] ??
+      parseResult?.topics.find(t => t.normalisedName === normName)?.questions ??
+      []
+    )
+  }
+
+  /**
+   * Toggle the editor panel for a topic open/closed.
+   * On first open, deep-copies the parsed questions into editedQuestions so
+   * subsequent mutations never touch the original parse result.
+   */
+  function toggleEditor(normName: string) {
+    // Lazy-init edits before opening, so liveQuestions() is ready on first render
+    if (!editedQuestions[normName] && !expandedEditors.has(normName)) {
+      const original =
+        parseResult?.topics.find(t => t.normalisedName === normName)?.questions ?? []
+      setEditedQuestions(prev => ({
+        ...prev,
+        [normName]: original.map(q => ({ ...q, choices: [...q.choices] })),
+      }))
+    }
+    setExpandedEditors(prev => {
+      const next = new Set(prev)
+      if (next.has(normName)) next.delete(normName)
+      else next.add(normName)
+      return next
+    })
+  }
+
+  function deleteQuestion(normName: string, questionNumber: number) {
+    setEditedQuestions(prev => ({
+      ...prev,
+      [normName]: (prev[normName] ?? []).filter(q => q.questionNumber !== questionNumber),
+    }))
+  }
+
+  function updateQuestionText(normName: string, questionNumber: number, text: string) {
+    setEditedQuestions(prev => ({
+      ...prev,
+      [normName]: (prev[normName] ?? []).map(q =>
+        q.questionNumber === questionNumber ? { ...q, questionText: text } : q
+      ),
+    }))
+  }
+
+  function updateChoiceText(
+    normName: string,
+    questionNumber: number,
+    letter: ChoiceLetter,
+    text: string
+  ) {
+    setEditedQuestions(prev => ({
+      ...prev,
+      [normName]: (prev[normName] ?? []).map(q => {
+        if (q.questionNumber !== questionNumber) return q
+        return { ...q, choices: q.choices.map(c => c.letter === letter ? { ...c, text } : c) }
+      }),
+    }))
+  }
+
+  /**
+   * Set the correct answer for a question.
+   * Also clears the "No answer in key" issue so the question is no longer blocked.
+   */
+  function updateCorrectAnswer(normName: string, questionNumber: number, letter: ChoiceLetter) {
+    setEditedQuestions(prev => ({
+      ...prev,
+      [normName]: (prev[normName] ?? []).map(q =>
+        q.questionNumber === questionNumber
+          ? { ...q, correctAnswer: letter, issues: q.issues.filter(i => i !== 'No answer in key') }
+          : q
+      ),
+    }))
+  }
+
   // --- Validate before import ---
   function canImport(): { blocked: boolean; reason?: string } {
     if (!parseResult) return { blocked: true }
@@ -785,11 +1032,11 @@ export function DocxImportFBLA() {
       const name = topicNames[normName]?.trim()
       if (!name) return { blocked: true, reason: `Topic name cannot be empty (${topic.displayName})` }
 
-      const missing = topic.questions.filter(q => !q.correctAnswer).length
+      const missing = liveQuestions(normName).filter(q => !q.correctAnswer).length
       if (missing > 0 && !overridePartial.has(normName)) {
         return {
           blocked: true,
-          reason: `"${topic.displayName}" has ${missing} unanswered question(s). Either override or deselect the topic.`,
+          reason: `"${topic.displayName}" has ${missing} unanswered question(s). Either fix them in the editor, override, or deselect the topic.`,
         }
       }
     }
@@ -815,8 +1062,8 @@ export function DocxImportFBLA() {
       const topicName = topicNames[normName].trim()
       const usePartial = overridePartial.has(normName)
 
-      // Determine which questions to import
-      const toImport = topic.questions.filter(q => {
+      // Determine which questions to import — use live (possibly edited) list
+      const toImport = liveQuestions(normName).filter(q => {
         if (q.choices.length !== 4) return false
         if (!q.correctAnswer && !usePartial) return false
         if (!q.correctAnswer && usePartial) return false // still skip unanswered even in override
@@ -906,7 +1153,7 @@ export function DocxImportFBLA() {
   const importCheck = step === 'review' ? canImport() : { blocked: false }
 
   return (
-    <div ref={scrollRef} className="space-y-6">
+    <div ref={scrollRef} className="space-y-6 overflow-y-auto max-h-[80vh] scroll-smooth">
       {/* Header */}
       <div>
         <h3 className="text-lg font-bold text-gray-900 mb-1">Import from FBLA Study Guide</h3>
@@ -1017,13 +1264,16 @@ export function DocxImportFBLA() {
             {parseResult.topics.map(topic => {
               const normName = topic.normalisedName
               const isSelected = selectedTopics.has(normName)
-              const missingCount = topic.questions.filter(q => !q.correctAnswer).length
-              const otherIssues = topic.questions.filter(
+              // Use live (possibly edited) question list for all counts
+              const live = liveQuestions(normName)
+              const missingCount = live.filter(q => !q.correctAnswer).length
+              const otherIssues = live.filter(
                 q => q.issues.some(i => i !== 'No answer in key')
               ).length
-              const validCount = topic.questions.filter(q => q.issues.length === 0).length
+              const validCount = live.filter(q => q.issues.length === 0).length
               const isOverridden = overridePartial.has(normName)
               const isBlocked = isSelected && missingCount > 0 && !isOverridden
+              const isEditorOpen = expandedEditors.has(normName)
 
               return (
                 <div
@@ -1099,7 +1349,7 @@ export function DocxImportFBLA() {
                         {otherIssues} question(s) with other issues (will be skipped)
                       </summary>
                       <div className="px-4 py-2 max-h-32 overflow-y-auto space-y-1">
-                        {topic.questions
+                        {live
                           .filter(q => q.issues.some(i => i !== 'No answer in key'))
                           .map(q => (
                             <div key={q.questionNumber} className="text-xs text-gray-600">
@@ -1109,6 +1359,159 @@ export function DocxImportFBLA() {
                           ))}
                       </div>
                     </details>
+                  )}
+
+                  {/* ── Question editor ── */}
+                  {isSelected && (
+                    <div className="border-t border-gray-200">
+                      <button
+                        onClick={() => toggleEditor(normName)}
+                        className="w-full flex items-center justify-between px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                      >
+                        <span>✏️ Edit questions ({live.length})</span>
+                        <span className="text-gray-400">{isEditorOpen ? '▲ collapse' : '▼ expand'}</span>
+                      </button>
+
+                      {isEditorOpen && (
+                        <div className="divide-y divide-gray-100 max-h-[520px] overflow-y-auto border-t border-gray-100">
+                          {live.length === 0 && (
+                            <p className="px-4 py-3 text-xs text-gray-400 italic">
+                              All questions have been deleted.
+                            </p>
+                          )}
+                          {live.map(q => {
+                            // Issues still relevant after any edits
+                            const activeIssues = q.issues.filter(
+                              i => i !== 'No answer in key' || !q.correctAnswer
+                            )
+                            return (
+                              <div
+                                key={q.questionNumber}
+                                className={`px-4 py-3 space-y-2 ${activeIssues.length > 0 ? 'bg-red-50/40' : ''}`}
+                              >
+                                {/* Row: question number + correct-answer selector + delete */}
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-mono text-gray-400 shrink-0 w-8">
+                                    Q{q.questionNumber}
+                                  </span>
+                                  <label className="text-xs text-gray-500 shrink-0">Correct:</label>
+                                  <select
+                                    value={q.correctAnswer ?? ''}
+                                    onChange={e =>
+                                      updateCorrectAnswer(normName, q.questionNumber, e.target.value as ChoiceLetter)
+                                    }
+                                    className={`text-xs border rounded px-1 py-0.5 ${
+                                      q.correctAnswer
+                                        ? 'border-green-400 text-green-700 bg-green-50'
+                                        : 'border-red-400 text-red-600 bg-red-50'
+                                    }`}
+                                  >
+                                    <option value="">—</option>
+                                    {VALID_LETTERS.map(l => (
+                                      <option key={l} value={l}>{l}</option>
+                                    ))}
+                                  </select>
+                                  <button
+                                    onClick={() => deleteQuestion(normName, q.questionNumber)}
+                                    className="ml-auto text-xs text-red-400 hover:text-red-600 shrink-0 transition-colors"
+                                    title="Delete this question"
+                                  >
+                                    🗑 Delete
+                                  </button>
+                                </div>
+
+                                {/* Question text */}
+                                <textarea
+                                  value={q.questionText}
+                                  onChange={e =>
+                                    updateQuestionText(normName, q.questionNumber, e.target.value)
+                                  }
+                                  rows={2}
+                                  className="w-full text-xs border border-gray-200 rounded px-2 py-1 resize-y focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
+                                  placeholder="Question text"
+                                />
+
+                                {/* Choices: always render all 4 slots A–D.
+                                    Missing choices get an empty editable input so the
+                                    user can type them in directly in the editor. */}
+                                <div className="space-y-1">
+                                  {VALID_LETTERS.map(letter => {
+                                    const c = q.choices.find(ch => ch.letter === letter)
+                                    const isMissing = !c
+                                    return (
+                                      <div key={letter} className="flex items-center gap-2">
+                                        {/* Letter badge — click to mark correct */}
+                                        <button
+                                          onClick={() =>
+                                            updateCorrectAnswer(normName, q.questionNumber, letter)
+                                          }
+                                          title="Set as correct answer"
+                                          className={`w-6 h-6 text-xs font-bold rounded shrink-0 transition-colors ${
+                                            letter === q.correctAnswer
+                                              ? 'bg-green-500 text-white'
+                                              : 'bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-700'
+                                          }`}
+                                        >
+                                          {letter}
+                                        </button>
+                                        <input
+                                          type="text"
+                                          value={c?.text ?? ''}
+                                          placeholder={isMissing ? 'Missing — type to add' : ''}
+                                          onChange={e => {
+                                            if (isMissing) {
+                                              // Add the choice to the question's choices array
+                                              setEditedQuestions(prev => ({
+                                                ...prev,
+                                                [normName]: (prev[normName] ?? []).map(eq => {
+                                                  if (eq.questionNumber !== q.questionNumber) return eq
+                                                  const newChoices = [
+                                                    ...eq.choices,
+                                                    { letter, text: e.target.value },
+                                                  ].sort((a, b) => a.letter.localeCompare(b.letter))
+                                                  // Recalculate issues: remove the "Missing choice X" for this letter
+                                                  const newIssues = eq.issues.filter(
+                                                    iss => iss !== `Missing choice ${letter}` &&
+                                                           iss !== `Has ${eq.choices.length}/4 choices`
+                                                  )
+                                                  const stillMissing = VALID_LETTERS.filter(
+                                                    l => !newChoices.find(nc => nc.letter === l)
+                                                  )
+                                                  if (stillMissing.length > 0) {
+                                                    newIssues.push(`Has ${newChoices.length}/4 choices`)
+                                                  }
+                                                  return { ...eq, choices: newChoices, issues: newIssues }
+                                                }),
+                                              }))
+                                            } else {
+                                              updateChoiceText(normName, q.questionNumber, letter, e.target.value)
+                                            }
+                                          }}
+                                          className={`flex-1 text-xs border rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-400 ${
+                                            isMissing
+                                              ? 'border-dashed border-red-300 bg-red-50 placeholder:text-red-300'
+                                              : letter === q.correctAnswer
+                                                ? 'border-green-300 bg-green-50'
+                                                : 'border-gray-200 bg-white'
+                                          }`}
+                                        />
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+
+                                {/* Remaining issues */}
+                                {activeIssues.length > 0 && (
+                                  <p className="text-xs text-orange-600">
+                                    ⚠ {activeIssues.join(' · ')}
+                                  </p>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               )
@@ -1190,9 +1593,8 @@ export function DocxImportFBLA() {
               {importCheck.blocked
                 ? 'Resolve issues above to import'
                 : `Import ${[...selectedTopics].reduce((n, k) => {
-                    const t = parseResult.topics.find(t => t.normalisedName === k)!
                     const partial = overridePartial.has(k)
-                    return n + t.questions.filter(q =>
+                    return n + liveQuestions(k).filter(q =>
                       q.issues.length === 0 || (partial && q.issues.every(i => i === 'No answer in key') && q.correctAnswer)
                     ).length
                   }, 0)} questions across ${selectedTopics.size} topic(s)`}
