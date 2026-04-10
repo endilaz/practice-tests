@@ -190,7 +190,7 @@ function parseAnswerKeysFromLines(
   // Paren may be a literal ")" or an OCR-misread glyph (Y, l, j, etc.).
   // A fully missing paren (fix 1) is also accepted when the number is
   // preceded by a word boundary so we don't match arbitrary numbers in text.
-  // const entryRe = /(?<!\d)(\d+)[)Ylj]?\s*([A-D])(?=[\s,]|$)/gi
+  // const entryRe = /(?<!\d)(\d+)[)Ylj]?\s*([A-D])(?=[\s,\d]|$)/gi
   // const headerRe = /^(.+?)\s+answer\s+key$/i
   // headerRe removed — replaced by matchAnswerKeyHeader() helper
 
@@ -225,8 +225,9 @@ function parseAnswerKeysFromLines(
   }
 
   // Second pass — Case B (iterate backwards so splices don't shift indices)
-  // Inline entry scanner used for both finding and rebuilding
-  const ENTRY_SCAN_RE = /(?<!\d)(\d+)[)Ylj]?\s*([A-D])(?=[\s,]|$)/gi
+  // Lookahead allows: whitespace, comma, digit (start of next entry), or end-of-string.
+  // The digit case handles packed lines like "5) C15) A26) A" with no separator.
+  const ENTRY_SCAN_RE = /(?<!\d)(\d+)[)Ylj]?\s*([A-D])(?=[\s,\d]|$)/gi
 
   for (let i = merged.length - 1; i > 0; i--) {
     const line = merged[i].trim()
@@ -322,7 +323,8 @@ function parseAnswerKeysFromLines(
 
     // Normalize "30 )" -> "30)" before matching
     const normalised = trimmed.replace(/(\d+)\s+\)/g, '$1)')
-    for (const em of normalised.matchAll(/(?<!\d)(\d+)[)Ylj]?\s*([A-D])(?=[\s,]|$)/gi)) {
+    // Lookahead: whitespace, comma, digit (packed entries like "5)C15)A"), or end-of-string
+    for (const em of normalised.matchAll(/(?<!\d)(\d+)[)Ylj]?\s*([A-D])(?=[\s,\d]|$)/gi)) {
       currentEntries[parseInt(em[1])] = em[2].toUpperCase() as ChoiceLetter
     }
   }
