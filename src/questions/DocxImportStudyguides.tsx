@@ -783,27 +783,41 @@ function computeStats(topics: TopicBlock[]) {
 }
 
 // ---------------------------------------------------------------------------
-// Main parse entry point
+// Parse pipeline — shared by initial file parse and re-parse-from-text
 // ---------------------------------------------------------------------------
+
+/**
+ * Run the question + answer-key parsing pipeline on already-extracted lines.
+ * Used by both the initial file parse and the "re-parse from edited text" path.
+ *
+ * For DOCX files the answer key lives in Word tables (not body paragraphs), so
+ * an optional xmlDoc can be supplied to re-extract table-based keys via the DOM
+ * walker. For PDF and re-parse-from-text paths, answer keys are parsed directly
+ * from the lines (they appear as plain paragraphs in both those cases).
+ */
+function parseFromLines(
+  lines: string[],
+  xmlDoc?: Document
+): ParseResult {
+  const answerKeys = xmlDoc
+    ? parseAnswerKeys([], [], xmlDoc)          // DOCX: keys in Word tables
+    : parseAnswerKeysFromLines(lines)          // PDF / re-parse: keys inline
+
+  const { topics, issues } = parseTopicBlocks(lines, answerKeys)
+  return { topics, parsingIssues: issues, rawLines: lines, stats: computeStats(topics) }
+}
 
 async function parseDocument(file: File): Promise<ParseResult> {
   const buffer = await file.arrayBuffer()
-  let bodyLines: string[]
-  let answerKeys: Map<string, Record<number, ChoiceLetter>>
 
   if (file.name.toLowerCase().endsWith('.pdf')) {
-    // PDF path: extract text lines, parse answer keys from plain paragraphs
-    bodyLines = await extractPdfText(buffer)
-    answerKeys = parseAnswerKeysFromLines(bodyLines)
+    const bodyLines = await extractPdfText(buffer)
+    return parseFromLines(bodyLines)
   } else {
-    // DOCX path: separate body paragraphs from table cells, use DOM walker
-    const extracted = await extractDocxText(buffer)
-    bodyLines = extracted.bodyLines
-    answerKeys = parseAnswerKeys([], [], extracted.xmlDoc)
+    const { bodyLines, xmlDoc } = await extractDocxText(buffer)
+    // Pass xmlDoc so table-based answer keys are parsed from the DOM.
+    return parseFromLines(bodyLines, xmlDoc)
   }
-
-  const { topics, issues } = parseTopicBlocks(bodyLines, answerKeys)
-  return { topics, parsingIssues: issues, rawLines: bodyLines, stats: computeStats(topics) }
 }
 
 // ---------------------------------------------------------------------------
@@ -830,6 +844,13 @@ export function DocxImportFBLA() {
   const [editedQuestions, setEditedQuestions] = useState<Record<string, ParsedQuestion[]>>({})
   // Which topics currently have their editor panel expanded
   const [expandedEditors, setExpandedEditors] = useState<Set<string>>(new Set())
+
+  // Editable raw text — initialized from parseResult.rawLines on first parse.
+  // The user can edit this and re-run the parser to fix extraction errors
+  // (e.g. OCR artifacts, merged lines, missing section headers).
+  const [rawText, setRawText] = useState<string>('')
+  // Whether the raw text editor panel is currently open
+  const [rawEditorOpen, setRawEditorOpen] = useState(false)
 
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<{ count: number; topicCount: number } | null>(null)
@@ -861,6 +882,8 @@ export function DocxImportFBLA() {
     setOverridePartial(new Set())
     setEditedQuestions({})
     setExpandedEditors(new Set())
+    setRawText('')
+    setRawEditorOpen(false)
     setError(null)
     setSuccess(null)
     setImportErrors([])
@@ -914,6 +937,10 @@ export function DocxImportFBLA() {
       setTopicNames(names)
       setSelectedTopics(selected)
       setParseResult(result)
+      // Initialize editable raw text from the extracted lines.
+      // Joining with newlines lets the user see and edit one line per row.
+      setRawText(result.rawLines.join('\n'))
+      setRawEditorOpen(false)
       setStep('review')
     } catch (err: unknown) {
       console.error('Parse error:', err)
@@ -1022,6 +1049,55 @@ export function DocxImportFBLA() {
           : q
       ),
     }))
+  }
+
+  // --- Re-parse from edited raw text ---
+  /**
+   * Re-runs the parsing pipeline on the user-edited raw text instead of the
+   * original file. Splits the textarea content into lines, feeds them through
+   * parseFromLines(), and replaces the current parseResult — identical to what
+   * handleParse() does after file extraction, but skipping the file I/O step.
+   *
+   * Note: for DOCX files the answer key normally comes from Word table cells,
+   * which are NOT present in rawLines (body-only extraction). If the user needs
+   * to fix answer key data for a DOCX, they should add "N) L" style lines in
+   * the raw text under a "<Topic> Answer Key" header — the PDF-style plain-text
+   * answer key parser will pick them up.
+   */
+  function handleReparse() {
+    setError(null)
+    const lines = rawText.split('\n')
+
+    let result: ParseResult
+    try {
+      result = parseFromLines(lines)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Re-parse failed')
+      return
+    }
+
+    if (result.topics.length === 0) {
+      setError('No question sections found after re-parse. Check that "[TOPIC] SAMPLE QUESTIONS" headings are present.')
+      return
+    }
+
+    // Re-run the same auto-selection logic as the initial parse
+    const names: Record<string, string> = {}
+    const selected = new Set<string>()
+    for (const t of result.topics) {
+      names[t.normalisedName] = t.displayName
+      if (t.questions.some(q => q.issues.length === 0)) {
+        selected.add(t.normalisedName)
+      }
+    }
+
+    setParseResult(result)
+    setTopicNames(names)
+    setSelectedTopics(selected)
+    // Clear all in-memory question edits — they referred to the old parse result
+    setEditedQuestions({})
+    setExpandedEditors(new Set())
+    setOverridePartial(new Set())
   }
 
   // --- Validate before import ---
@@ -1520,57 +1596,62 @@ export function DocxImportFBLA() {
             })}
           </div>
 
-          {/* Raw parse viewer */}
-          <details className="border border-gray-200 rounded-lg">
-            <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50">
-              🔍 Show raw parse data (for debugging)
-            </summary>
-            <div className="border-t divide-y divide-gray-100 text-xs font-mono">
-              {/* Per-topic question breakdown */}
-              {parseResult.topics.map(topic => (
-                <details key={topic.normalisedName} className="group">
-                  <summary className="cursor-pointer px-4 py-2 bg-gray-50 font-sans text-sm font-medium text-gray-700 hover:bg-gray-100">
-                    {topic.displayName} — {topic.questions.length} questions
-                  </summary>
-                  <div className="max-h-96 overflow-y-auto">
-                    {topic.questions.map(q => (
-                      <div key={q.questionNumber} className={`px-4 py-2 border-l-4 ${q.issues.length > 0 ? 'border-red-400 bg-red-50' : 'border-green-400 bg-white'}`}>
-                        <div className="font-sans font-medium text-gray-800 mb-1">
-                          Q{q.questionNumber}
-                          {q.correctAnswer && <span className="ml-2 text-green-600">✓ {q.correctAnswer}</span>}
-                          {!q.correctAnswer && <span className="ml-2 text-red-500">no answer</span>}
-                          {q.issues.length > 0 && (
-                            <span className="ml-2 text-red-600 text-xs">[{q.issues.join(' | ')}]</span>
-                          )}
-                        </div>
-                        <div className="text-gray-600 mb-1 whitespace-pre-wrap">{q.questionText || '(empty)'}</div>
-                        {q.choices.map(c => (
-                          <div key={c.letter} className={`ml-2 ${c.letter === q.correctAnswer ? 'text-green-700 font-semibold' : 'text-gray-500'}`}>
-                            {c.letter}) {c.text}
-                          </div>
-                        ))}
-                        {q.choices.length === 0 && <div className="ml-2 text-red-500 italic">no choices parsed</div>}
-                      </div>
-                    ))}
+          {/* Raw text editor — lets the user fix extraction errors and re-parse */}
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setRawEditorOpen(o => !o)}
+              className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors text-left"
+            >
+              <span>🛠 Edit raw extracted text &amp; re-parse</span>
+              <span className="text-gray-400 text-xs">{rawEditorOpen ? '▲ collapse' : '▼ expand'}</span>
+            </button>
+
+            {rawEditorOpen && (
+              <div className="border-t border-gray-200 p-4 space-y-3">
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  This is the text extracted from your file, one line per row. Edit it to fix OCR
+                  errors, merge split lines, correct answer key entries, or add missing section
+                  headers — then click <strong>Re-parse</strong> to rebuild the topic list above.
+                  Edits here are independent of the per-question editor above.
+                </p>
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                  ⚠ For DOCX files, answer keys live in Word table cells which are not shown here.
+                  You can add plain-text answer key lines in the format{' '}
+                  <span className="font-mono">Topic Name Answer Key</span> followed by{' '}
+                  <span className="font-mono">1) A  2) B  3) C …</span> and they will be picked up
+                  on re-parse.
+                </p>
+                <textarea
+                  value={rawText}
+                  onChange={e => setRawText(e.target.value)}
+                  rows={20}
+                  spellCheck={false}
+                  className="w-full text-xs font-mono border border-gray-300 rounded-lg px-3 py-2 resize-y focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white leading-relaxed"
+                  placeholder="Extracted text will appear here after parsing…"
+                />
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs text-gray-400">
+                    {rawText.split('\n').length} lines · {rawText.length} chars
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setRawText(parseResult.rawLines.join('\n'))}
+                      className="px-3 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                      title="Discard edits and restore the original extracted text"
+                    >
+                      Reset to original
+                    </button>
+                    <button
+                      onClick={handleReparse}
+                      className="px-4 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      ↺ Re-parse
+                    </button>
                   </div>
-                </details>
-              ))}
-              {/* Raw extracted lines */}
-              <details>
-                <summary className="cursor-pointer px-4 py-2 bg-gray-50 font-sans text-sm font-medium text-gray-700 hover:bg-gray-100">
-                  Raw extracted lines ({parseResult.rawLines.length})
-                </summary>
-                <div className="max-h-96 overflow-y-auto px-4 py-2 space-y-0.5">
-                  {parseResult.rawLines.map((line, idx) => (
-                    <div key={idx} className="flex gap-3">
-                      <span className="text-gray-300 select-none w-8 text-right shrink-0">{idx}</span>
-                      <span className="text-gray-700 whitespace-pre-wrap break-all">{line}</span>
-                    </div>
-                  ))}
                 </div>
-              </details>
-            </div>
-          </details>
+              </div>
+            )}
+          </div>
 
           {/* Blocked reason */}
           {importCheck.blocked && importCheck.reason && (
