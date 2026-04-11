@@ -1,15 +1,25 @@
 # FBLA Practice Tests — Developer Context
-## 0. AI Guidelines 
-- **SEARCH FOR POTENTIAL BUGS AND SECURITY VULNERABILITIES** in all the code you write. I expect you to automatically find these flaws immediately after producing code, don't wait for a prompt to do this
-1. **Quality over quantity**: Robust, maintainable code prioritized over feature volume
-2. **No assumptions**: Always ask for clarification if anything is unclear
-3. **Focus on maintainability**: Clear, documented, modular code structure
-4. **Scalability**: Architecture supports growth without major refactoring
-5. **Flexibility**: Use CSS variables and configurable constants for easy customization
-- **Incremental development** - build and test each feature before moving to next
-- **Ask for confirmation** before proceeding with major changes
-- **Write clear, maintainable code** with comments where needed
-- **Do not reproduce code files when modifying them**, simply give a diff of the relevant lines
+
+> **This file is the single source of truth for the current state of the project.**
+> `PROJECT_SPECIFICATION.md` is a historical design document — useful for intent and
+> feature requirements, but its schema definitions and file structure have drifted from
+> reality. Always trust this file over the spec.
+
+---
+
+## 0. AI Guidelines
+
+- **SEARCH FOR POTENTIAL BUGS AND SECURITY VULNERABILITIES** in all code you write. Find them immediately after producing code — do not wait for a prompt.
+- **Do not reproduce code files when modifying them** — give a diff of the relevant lines only.
+- **Ask for confirmation** before proceeding with major changes.
+- **No assumptions** — ask for clarification if anything is unclear.
+- **Comment all files at the top** with a high-level summary and purpose.
+
+1. **Quality over quantity** — robust, maintainable code over feature volume
+2. **Focus on maintainability** — clear, documented, modular structure
+3. **Scalability** — architecture supports growth without major refactoring
+4. **Flexibility** — use CSS variables and configurable constants for easy customization
+5. **Incremental development** — build and test each feature before moving to the next
 
 ---
 
@@ -19,14 +29,103 @@ A React + Supabase web app where students practice for FBLA competitions by taki
 
 ---
 
+## 2. Tech Stack
 
-## 4. Database (Supabase — all migrations have been run)
+| Layer | Technology |
+|---|---|
+| Frontend | React 19, TypeScript, Vite 7 |
+| Styling | Tailwind CSS v4 (via `@tailwindcss/vite` plugin) |
+| Routing | React Router v7 (`createBrowserRouter`) |
+| Server state | TanStack React Query v5 (installed, not yet used in any component) |
+| Validation | Zod v4 |
+| Backend | Supabase (Auth, PostgreSQL + RLS, Storage) |
+| Path alias | `@/` → `src/` (configured in both `vite.config.ts` and `tsconfig.app.json`) |
+| PDF parsing | pdf.js 3.11 (loaded from CDN at runtime — not bundled) |
+| DOCX parsing | jszip (dynamic import) + browser DOMParser |
+
+---
+
+## 3. Project File Tree
+
+```
+practice_tests\
+├── .env.local                          ← Supabase URL + anon key (do not commit)
+├── .gitignore
+├── index.html                          ← Vite entry point, mounts src/main.tsx
+├── package.json                        ← type: module, scripts: dev/build/preview
+├── package-lock.json
+├── vite.config.ts                      ← React plugin, Tailwind plugin, @/ alias
+├── tsconfig.json
+├── tsconfig.app.json                   ← covers src/, has @/ path alias
+├── tsconfig.node.json                  ← covers vite.config.ts only
+└── src\
+    ├── index.css                       ← Tailwind entry (@import "tailwindcss")
+    ├── main.tsx                        ← React mount into #root, imports CSS, wraps providers
+    ├── app\
+    │   ├── App.tsx                     ← Renders <RouterProvider router={router} />
+    │   ├── providers.tsx               ← Wraps with AuthProvider + QueryClientProvider
+    │   └── router.tsx                  ← All routes (see Section 4)
+    ├── auth\
+    │   ├── AuthProvider.tsx            ← Session bootstrap + role fetch from DB
+    │   ├── ProtectedRoute.tsx          ← Route guard (user + optional requireAdmin)
+    │   └── useAuth.ts                  ← Re-exports useAuth from AuthProvider
+    ├── lib\
+    │   ├── env.ts                      ← Runtime guard for required env vars
+    │   └── supabase.ts                 ← Single Supabase client instance
+    ├── pages\
+    │   ├── Login.tsx                   ← Login form with error handling
+    │   ├── Register.tsx                ← Registration form with error handling
+    │   ├── Dashboard.tsx               ← User landing: TestConfigForm + test history table
+    │   ├── Admin.tsx                   ← Admin panel: tabbed Topics / Questions / Analytics
+    │   └── Results.tsx                 ← Post-test results: score summary + question review
+    ├── analytics\
+    │   ├── QuestionAnalytics.tsx       ← Paginated question stats table + detail modal
+    │   └── UserAnalytics.tsx           ← User stats table + detail modal
+    ├── questions\
+    │   ├── question.schema.ts          ← Zod schema for question create/edit form
+    │   ├── QuestionsAdmin.tsx          ← Admin CRUD for questions (with image upload)
+    │   ├── useQuestions.ts             ← Hook for question data fetching
+    │   └── DocxImportStudyguides.tsx   ← FBLA study guide bulk importer (DOCX + PDF)
+    ├── tests\
+    │   ├── test.schema.ts              ← Zod schema for test config form
+    │   ├── TestConfig.tsx              ← Test setup form (topic, count, timer)
+    │   ├── TestShell.tsx               ← Full test-taking interface (see Section 7)
+    │   ├── PracticeShell.tsx           ← Practice mode variant (/practice route)
+    │   └── useGenerateTest.ts          ← Hook wrapping the generate_test() RPC
+    ├── topics\
+    │   ├── topic.schema.ts             ← Zod schema for topic form
+    │   ├── TopicsAdmin.tsx             ← Admin CRUD for topics
+    │   └── useTopics.ts                ← Hook for topic data fetching
+    └── ui\                             ← Shared UI primitives
+```
+
+---
+
+## 4. Routes
+
+Defined in `src/app/router.tsx`:
+
+| Path | Component | Guard |
+|---|---|---|
+| `/login` | `Login` | Public |
+| `/register` | `Register` | Public |
+| `/` | `Dashboard` | Auth required |
+| `/test/:id` | `TestShell` | Auth required |
+| `/practice` | `PracticeShell` | Auth required |
+| `/results/:id` | `Results` | Auth required |
+| `/admin` | `Admin` | Auth + admin role required |
+
+The `:id` in `/test/:id` and `/results/:id` is the `attempt_id` UUID returned by `generate_test()`. `TestConfig` calls `useGenerateTest`, then navigates to `/test/:id`.
+
+---
+
+## 5. Database
 
 ### Tables
 
 All IDs are `uuid` with `default gen_random_uuid()`. All tables have RLS enabled.
 
-**`users`** — 1:1 with `auth.users`. Columns: `id`, `email`, `role` (text, `'user'|'admin'`), `created_at`. A `SECURITY DEFINER` trigger (`handle_new_user`) auto-creates a row on signup with `role = 'user'`. The trigger has `set search_path = public`.
+**`users`** — 1:1 with `auth.users`. Columns: `id`, `email`, `role` (text, `'user'|'admin'`), `created_at`. A `SECURITY DEFINER` trigger (`handle_new_user`) auto-creates a row on signup with `role = 'user'`. Trigger has `set search_path = public`.
 
 **`topics`** — Columns: `id`, `name` (text, unique), `created_at`. Publicly readable. Admin-write only.
 
@@ -36,7 +135,7 @@ All IDs are `uuid` with `default gen_random_uuid()`. All tables have RLS enabled
 
 **`test_attempts`** — Columns: `id`, `user_id` (FK → users), `topic_id` (FK → topics), `question_count`, `use_timer` (boolean), `minutes` (nullable), `started_at`, `completed_at`, `score`, `total_possible`, `total_time_seconds`, `out_of_browser_seconds`, `created_at`. Users read/update own rows. Admins read all.
 
-**`attempt_questions`** — Columns: `id`, `attempt_id` (FK → test_attempts, cascade), `question_id` (FK → questions), `position` (int, unique per attempt). Users read/insert own (via attempt ownership). Admins read all.
+**`attempt_questions`** — Columns: `id`, `attempt_id` (FK → test_attempts, cascade), `question_id` (FK → questions), `position` (int, unique per attempt). Users read/insert own. Admins read all.
 
 **`question_responses`** — Columns: `id`, `attempt_id`, `question_id`, `selected_choice_id` (nullable FK → answer_choices), `is_correct` (nullable), `time_spent_seconds`, `marked_for_review`, `eliminated_choices` (jsonb, default `[]`), `displayed_choices_order` (jsonb, default `[]`), `tab_switch_count`, `answered_at`. Unique on `(attempt_id, question_id)`. Users read/update own. Admins read all.
 
@@ -44,188 +143,230 @@ All IDs are `uuid` with `default gen_random_uuid()`. All tables have RLS enabled
 
 ### Key RLS Rules
 
-- Users cannot change their own `role` (WITH CHECK enforces `role` stays at current value).
-- Admins cannot demote themselves (WITH CHECK requires `role = 'admin'` on own row).
-- `generate_test()` runs as `SECURITY DEFINER` with `set search_path = public`.
+- Users cannot change their own `role`.
+- Admins cannot demote themselves.
+- `generate_test()` and `submit_test()` run as `SECURITY DEFINER` with `set search_path = public`.
 
-### Functions
+### Database Functions
 
 **`generate_test(p_topic_id uuid, p_question_count int, p_use_timer boolean, p_minutes int) → uuid`**
-- Auth guard (`auth.uid() is null` → exception).
-- Validates question count (1–100), timer (1–180 min if enabled), topic existence, and that enough questions exist.
-- Creates `test_attempts` row.
-- Selects N random questions, inserts into `attempt_questions` with stable position ordering.
-- Initializes `question_responses` rows with `displayed_choices_order` as randomized jsonb array (e.g. `["C","A","D","B"]`) and empty `eliminated_choices`.
-- Returns the new `attempt_id` (uuid).
-- **Does not expose correct answers to the client.**
+- Auth-guarded. Validates count (1–100), timer (1–180 min), topic existence, sufficient pool size.
+- Creates `test_attempts` row, selects N random questions into `attempt_questions` with stable positions, initializes `question_responses` rows with randomized `displayed_choices_order`.
+- Returns `attempt_id`. **Never exposes correct answers.**
 
-**`submit_test()`** — Defined in the spec but **not confirmed as implemented**. Will be needed at the end of the test-taking flow. Scores the attempt and sets `completed_at`, `score`, `total_possible`, `total_time_seconds`.
+**`submit_test(p_attempt_id uuid) → {score, total}`**
+- Scores the attempt server-side by reading `question_responses.is_correct`.
+- Sets `completed_at`, `score`, `total_possible`, `total_time_seconds` on `test_attempts`.
+- Returns `{score, total}` — used by `TestShell` for the immediate post-submit screen.
+
+**`get_question_analytics(p_search, p_topic, p_sort, p_limit, p_offset) → QuestionStat[]`**
+- Powers `QuestionAnalytics`. Returns paginated, filtered, sorted stats.
+- Fields: `question_id`, `question_text`, `topic_name`, `times_attempted`, `times_correct`, `correctness_pct`, `avg_time_spent`, `times_marked`, `avg_difficulty`, `avg_quality`.
+
+**`get_question_analytics_count(p_search, p_topic) → bigint`**
+- Companion to above — returns total matching row count for pagination.
 
 ### Storage
 
-- Bucket `question-images` exists, is public, 5 MB file limit.
-- Authenticated users can upload. Only admins can delete.
+Bucket `question-images`: public, 5 MB limit. Authenticated users can upload. Only admins can delete.
 
 ---
 
-## 5. What Is Fully Implemented and Tested
+## 6. Feature Status
 
 | # | Feature | Status |
 |---|---|---|
 | 1 | Auth, core tables, RLS | ✅ Complete |
-| 2 | Frontend scaffold + auth flow | ✅ Complete (but main.tsx/App.tsx/providers.tsx are empty — see Section 7) |
-| 3A | Admin Topics CRUD UI | ✅ Complete |
-| 3B | User Test Config form | ✅ Complete |
-| 4 | `generate_test()` backend function | ✅ Complete |
+| 2 | Frontend scaffold, routing, auth flow | ✅ Complete |
+| 3A | Admin — Topics CRUD | ✅ Complete |
+| 3B | Admin — Questions CRUD + image upload | ✅ Complete |
+| 3C | Admin — FBLA study guide bulk importer | ✅ Complete |
+| 4 | `generate_test()` + `useGenerateTest` hook | ✅ Complete |
+| 5 | Test-taking interface (`TestShell`) | ✅ Complete |
+| 6 | Results page | ✅ Complete |
+| 7 | Dashboard with test history | ✅ Complete |
+| 8 | Question analytics | ✅ Complete |
+| 9 | User analytics | ✅ Complete |
 
 ---
 
----
+## 7. Key Components — Behavioral Notes
 
-## 9. Development Rules
+### `TestShell` (`src/tests/TestShell.tsx`)
 
-- **SEARCH FOR POTENTIAL BUGS AND SECURITY VULNERABILITIES** in all the code you write. I expect you to automatically find these flaws immediately after producing code, don't wait for a prompt to do this
-1. **Quality over quantity**: Robust, maintainable code prioritized over feature volume
-2. **No assumptions**: Always ask for clarification if anything is unclear
-3. **Focus on maintainability**: Clear, documented, modular code structure
-4. **Scalability**: Architecture supports growth without major refactoring
-5. **Flexibility**: Use CSS variables and configurable constants for easy customization
-- **Incremental development** - build and test each feature before moving to next
-- **Ask for confirmation** before proceeding with major changes
-- **Write clear, maintainable code** with comments where needed
-1. **Never trust the frontend for security.** RLS is authoritative. The frontend must never assume a role or skip a check that the database doesn't also enforce.
-2. **Role comes from the database, never from the JWT.** `AuthProvider` fetches role via a query to `public.users`. This is already implemented — do not change this pattern.
-3. **`generate_test()` does not expose correct answers.** The client never receives `is_correct` or `selected_choice_id` mappings until the test is submitted and scored server-side.
-4. **Empty files are not bugs — they are placeholders.** Several files exist with no content. This is intentional scaffolding. Do not delete them; fill them in when their feature is needed.
-5. **Mutations use a `mutating`/`submitting` flag.** This pattern is established in `TopicsAdmin` and `TestConfig`. All future mutation-triggering buttons should follow it to prevent duplicate submissions.
-6. **Errors clear on input change.** Established pattern: `setError(null)` in every `onChange`. Follow it.
-7. **Supabase calls are direct** (no abstraction layer yet). Components call `supabase.from(...)` or `supabase.rpc(...)` directly. React Query is installed for future use but not yet in any component. Don't introduce it until there's a concrete reason.
-8. **`@/` imports only.** All cross-directory imports use the `@/` alias. Never use relative paths that escape the current directory (e.g. `../../lib/supabase` → `@/lib/supabase`).
-9. **Tailwind only for styling.** No inline styles, no CSS modules, no styled-components. Utility classes only.
-10. **Don't write what isn't needed yet.** If a feature isn't the current task, don't stub it or anticipate its shape. The empty placeholder files already do that job.
+Full test-taking UI. Receives `attempt_id` from the URL param (`/test/:id`).
 
+**Data loading:** Loads `test_attempts` (timer config + `started_at`), `attempt_questions` (ordered by `position`), `answer_choices` (bulk fetch for all question IDs in one query), and `question_responses` in sequence. Sets `started_at` on first load if not already set (safe on refresh).
 
-## 10. Implementation Phases
+**View modes:** `'one'` (default — one question at a time with prev/next), `'all'` (scrollable list, palette buttons scroll to question), `'review'` (only marked questions; snaps to first marked on mode switch; shows message if none marked).
 
-### Week 1: Foundation (20-25 hours)
-- Project setup, Supabase configuration
-- Database migrations
-- Authentication (login, register)
-- Basic routing and layouts
+**Answer selection:** Optimistic UI update → DB write → rollback on error. Eliminated choices cannot be selected. Eliminating a selected choice deselects it first and immediately writes `selected_choice_id: null` to DB.
 
-### Week 2: Admin Topics & Questions (25-30 hours)
-- Topic CRUD
-- Question form with image upload
-- Questions list with pagination
-- JSON bulk import
+**Persistence strategy:**
+- `selectAnswer` / `clearAnswer` write to DB immediately on each interaction (fast path).
+- `doSave()` bulk-flushes all response rows — called by 30-second autosave interval and as a final flush before submit.
+- `responsesRef` and `currentIndexRef` mirror state into refs so interval callbacks and event listeners always read current values without stale closures.
 
-### Week 3: Test Generation & Taking (30-35 hours)
-- Test configuration page
-- generate_test function
-- Test-taking interface
-- Timer, elimination, marking
-- Auto-save, tab tracking
+**Submit flow:** User confirms → stop autosave interval and timer → `doSave()` → write total tab-switch count to `test_attempts.out_of_browser_seconds` → call `submit_test()` RPC → show score screen → user navigates to `/results/:id`.
 
-### Week 4: Results & User Features (25-30 hours)
-- Results page with score
-- Question review
-- Feedback collection
-- User dashboard
-- Test history
+**Tab tracking:** `visibilitychange` event increments `tab_switch_count` on the currently active question. Stored per-response; total written to attempt on submit.
 
-### Week 5: Admin Analytics & Polish (25-30 hours)
-- Question analytics
-- User performance analytics
-- Feedback review
-- UI polish, responsive design
-- Accessibility
+**Timer:** Countdown from `minutes * 60`. White → yellow under 5 min → red under 1 min. Auto-submits at 0.
 
-### Week 6: Testing & Deployment (15-20 hours)
-- Manual testing (all flows)
-- Cross-browser testing
-- Bug fixes
-- Production deployment
-- Documentation
+**Report issue modal:** Collects optional difficulty rating (1–5), quality rating (1–5), and free text. Inserts into `question_feedback`. Requires at least one field filled.
+
+**Palette:** Always-visible footer. Yellow = marked for review (priority over green), green = answered, gray = unanswered. Navy border = current question (single/review modes only). In review mode, unmarked buttons are dimmed and non-navigable.
+
+**Theme:** Navy `#1a2e5a` defined as `const NAVY` at the top of the file. Applied via inline `style` props where Tailwind cannot express dynamic values.
+
+### `Results` (`src/pages/Results.tsx`)
+
+Loads attempt metadata (with ownership check — `user_id === user.id` as a frontend guard on top of RLS), `attempt_questions` for position ordering, `question_responses`, questions, and choices. Redirects to `/test/:id` if `completed_at` is null. Displays choices in `displayed_choices_order` (the shuffled order the user saw). Correct answer = green border; user's wrong answer = red border; unanswered = gray badge.
+
+### `Dashboard` (`src/pages/Dashboard.tsx`)
+
+Two sections: `TestConfigForm` (starts a new test via `useGenerateTest` → navigates to `/test/:id`) and a paginated test history table (completed attempts only, configurable limit 5/10/20/50/100). Admin users see a link to `/admin` in the header.
+
+### `Admin` (`src/pages/Admin.tsx`)
+
+Three tabs: **Topics** (`TopicsAdmin`), **Questions** (`QuestionsAdmin`), **Analytics** (sub-tabbed: **Question Analytics** / **User Analytics**).
+
+### `QuestionAnalytics` (`src/analytics/QuestionAnalytics.tsx`)
+
+Calls `get_question_analytics` and `get_question_analytics_count` RPCs in parallel. Features: text search (300ms debounced), topic filter dropdown, sort by attempts/correctness/time/marked (asc/desc), pagination (50 per page). Detail modal shows answer distribution (bar chart per choice, proportional to `times_attempted`) and user feedback entries with ratings.
+
+### `UserAnalytics` (`src/analytics/UserAnalytics.tsx`)
+
+Fetches all users then per-user completed attempt stats (N+1 query pattern — acceptable for small admin user counts). Only users with at least one completed test are shown. Detail modal shows performance by topic (progress bars color-coded green/yellow/red by score) and last 20 completed tests.
+
+### `DocxImportStudyguides` (`src/questions/DocxImportStudyguides.tsx`)
+
+See Section 8.
+
+### `useGenerateTest` (`src/tests/useGenerateTest.ts`)
+
+Thin hook: `{ generateTest, loading, error }`. Calls `supabase.rpc('generate_test', {...})`. Returns `attempt_id` UUID on success, `null` on error.
 
 ---
 
-## 11. Testing Requirements
+## 8. FBLA Study Guide Importer
 
-### 11.1 Testing Checklist
+### Supported formats
+- **DOCX:** 2017–20 format (questions `1)`, choices `A)`); 2010–13 format (questions `1.`, choices `a.` with optional space after dot). Answer keys in 3-column Word tables.
+- **PDF:** Same guides in PDF form including the 400-page combined document. Text extracted via pdf.js from CDN. Answer keys are plain text paragraphs.
+
+### Answer key parsing — robustness techniques
+- **OCR spaces anywhere in topic name or suffix** (`"Intr oduction to Parliamentary Pr ocedure Answe r Key"`): `matchAnswerKeyHeader()` collapses all whitespace to match, then walks backwards through the original line to recover the topic name with original spacing.
+- **Missing or misread parentheses** (`10 B`, `20Y D`): entry regex uses `[)Ylj]?` as separator.
+- **Packed entries with no separator** (`5) C15) A26) A`): lookahead `(?=[\s,\d]|$)` treats a digit as a valid boundary after an answer letter.
+- **Orphaned question numbers — forward** (`6)\nB 16) C`): merged with the start of the next line.
+- **Orphaned question numbers — backward** (`C 20) D 30) D\n10)`): `10)` inserted in sorted position on the previous line; answer letter `C` recovered from context (the character preceding the next-higher entry).
+- **Topic name matching**: answer keys stored under both normal-normalised and fully space-collapsed (fuzzy) forms on both the key side and the lookup side.
+
+### In-memory question editor
+After parsing, each topic card has an expandable editor. Edits are in-memory only (lost on reset). `liveQuestions(normName)` is used everywhere — stats, `canImport`, `handleImport`, import button count — so edits immediately affect import eligibility. Per question: edit question text (textarea), edit any choice text (input), set correct answer (letter badge click or dropdown), add missing choices (all 4 slots always rendered — missing ones show dashed red input that creates the choice on first keystroke), delete question.
+
+### Import logic
+Finds or creates topic by name → inserts each valid question → inserts its answer choices. On choice insert failure, rolls back the orphaned question row. Topics with unanswered questions are blocked from import unless the user explicitly overrides to skip those questions.
+
+---
+
+## 9. Key Patterns and Conventions
+
+**Mutation guard:** Every async-write button uses a `mutating` or `submitting` boolean. Set `true` before the call, `false` in the finally path. Prevents duplicate submissions. Established in `TopicsAdmin`, `TestConfig`, `TestShell`.
+
+**Error clearing on input:** `setError(null)` in every `onChange` handler.
+
+**Role from DB, never JWT:** `AuthProvider` fetches role via `supabase.from('users').select('role')`. Never read from JWT or `user_metadata`. Do not change this pattern.
+
+**Optimistic updates with rollback:** Established in `TestShell.selectAnswer` and `clearAnswer`. Apply to any future mutation where per-click latency would be noticeable.
+
+**Refs for stale-closure-sensitive callbacks:** `responsesRef` / `currentIndexRef` in `TestShell`. Use this pattern whenever a `setInterval` or event listener callback needs to read current state without being torn down on every render.
+
+**Direct Supabase calls:** Components call `supabase.from(...)` or `supabase.rpc(...)` directly. React Query installed but not in use. Do not introduce it without a concrete reason.
+
+**`@/` imports only:** Never use relative paths that escape the current directory.
+
+**Tailwind only for styling:** No inline styles except where Tailwind cannot express dynamic values (e.g. the `NAVY` constant in `TestShell`).
+
+**RLS is authoritative:** Frontend never assumes a role or skips a check the database doesn't also enforce. Security-sensitive checks (e.g. ownership in `Results`) are a courtesy double-check, not a substitute for RLS.
+
+**`generate_test()` never exposes answers:** The client never receives `is_correct` values until after `submit_test()` completes.
+
+---
+
+## 10. Testing Checklist
 
 **Authentication:**
-- [ ] Register with valid/invalid credentials
-- [ ] Login with correct/incorrect password
-- [ ] Session persistence
-- [ ] Logout
-- [ ] Protected routes work
+- [ ] Register / login with valid and invalid credentials
+- [ ] Session persists across browser refresh
+- [ ] Logout works
+- [ ] Protected routes redirect unauthenticated users to `/login`
+- [ ] `/admin` redirects non-admin users to `/`
 
-**Topics:**
-- [ ] Admin can CRUD topics
-- [ ] Cannot create duplicate names
-- [ ] Cannot delete topic with questions
+**Topics / Questions:**
+- [ ] Admin can create, rename, delete topics; duplicate name rejected by DB
+- [ ] Admin can create/edit/delete questions with image upload
+- [ ] Deleting topic with questions fails (DB constraint)
 
-**Questions:**
-- [ ] Create with all fields
-- [ ] Upload images
-- [ ] Validate 4 choices, 1 correct
-- [ ] Bulk import from JSON
+**Study Guide Importer:**
+- [ ] DOCX import — 2017–20 and 2010–13 formats
+- [ ] PDF import — single topic and full combined document
+- [ ] OCR-spaced topic names match answer keys
+- [ ] Packed answer key lines parsed correctly
+- [ ] Editor: fix answers, edit choices, add missing choices, delete questions
+- [ ] Import blocked for unanswered questions without override
 
-**Test Taking:**
-- [ ] Generate test
-- [ ] Timer starts/counts correctly
-- [ ] Select answers
-- [ ] Eliminate choices
-- [ ] Mark for review
-- [ ] Navigate between questions
-- [ ] Auto-save works
-- [ ] Submit shows confirmation
+**Test Flow:**
+- [ ] `TestConfig` generates test and navigates to `/test/:id`
+- [ ] Questions in correct position order; choices in `displayed_choices_order`
+- [ ] Select, clear, eliminate answers; elimination deselects if needed
+- [ ] Mark for review; review-only mode filters correctly
+- [ ] All three view modes work correctly; mode switch preserves position
+- [ ] Timer counts down; yellow at 5 min, red at 1 min, auto-submits at 0
+- [ ] Autosave fires every 30 seconds
+- [ ] Tab switches increment `tab_switch_count` on the correct question
+- [ ] Submit: confirmation → RPC → score screen → navigate to `/results/:id`
+- [ ] Report issue modal submits to `question_feedback`
 
 **Results:**
-- [ ] Score calculated correctly
-- [ ] Explanations shown
-- [ ] Can rate questions
+- [ ] Choices displayed in original `displayed_choices_order`
+- [ ] Correct answer = green; user's wrong answer = red; unanswered = gray
+- [ ] Explanation shown when present
+- [ ] Accessing another user's results returns an error
+
+**Dashboard:**
+- [ ] Only completed attempts shown
+- [ ] History limit selector (5/10/20/50/100) works
+- [ ] "View Results" links to correct attempt
 
 **Analytics:**
-- [ ] Question stats accurate
-- [ ] User performance correct
-- [ ] Charts render
+- [ ] Question search, topic filter, sort, and pagination all work
+- [ ] Detail modal: answer distribution bars and feedback
+- [ ] User list shows only users with completed tests
+- [ ] User detail: performance by topic and test history
 
-### 11.2 Browser/Device Testing
-
-- Chrome, Firefox, Safari, Edge (latest)
-- iOS Safari, Android Chrome
-- Desktop, tablet, phone sizes
+### Browser / Device Testing
+Chrome, Firefox, Safari, Edge (latest) · iOS Safari, Android Chrome · Desktop, tablet, phone
 
 ---
 
----
+## 11. Future Enhancements
 
-## 13. Future Enhancements
+### 11.1 AI Features
+- Auto-generate explanations via OpenAI API
+- Difficulty prediction from attempt data
+- Duplicate/near-duplicate question detection
 
-### 13.1 PDF Parsing
-- Use pdf-parse or GPT-4 Vision
-- Extract questions automatically
-- Admin review before import
+### 11.2 Enhanced Analytics
+- Per-question time-spent distributions
+- Performance-over-time charts per user/topic
+- Spaced repetition scheduling
 
-### 13.2 CLI Tool
-- Node.js CLI for bulk operations
-- Integrate with PDF parser
-- Automated pipeline
-
-### 13.3 AI Features
-- Auto-generate explanations (OpenAI API)
-- Difficulty prediction
-- Question similarity detection
-
-### 13.4 Enhanced Analytics
-- Learning curve analysis
-- Predictive modeling
-- Question quality scoring
-
-### 13.5 Study Features
+### 11.3 Study Features
+- Practice mode with immediate per-question feedback (`/practice` route + `PracticeShell` already exist)
 - Flashcard mode
-- Spaced repetition
-- Practice mode (untimed)
 
----
+### 11.4 Admin Tooling
+- JSON bulk import (alternative to study guide importer)
+- CLI tool for bulk operations outside the browser

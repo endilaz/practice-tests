@@ -1,5 +1,5 @@
 # FBLA Practice Tests - File Structure Specification
-
+src
 │   index.css
 │   main.tsx
 │
@@ -32,6 +32,8 @@
 │       question.schema.ts
 │       QuestionsAdmin.tsx
 │       useQuestions.ts
+│       DocxImport.tsx
+│       DocxImportStudyguides.tsx
 │
 ├───tests
 │       PracticeShell.tsx
