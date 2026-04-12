@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/auth/useAuth'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -241,6 +242,9 @@ function QuestionCard(props: QuestionCardProps) {
 export default function TestShell() {
   const { id: attemptIdParam } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { user } = useAuth()
+  // Anonymous sessions: after results, route to /login instead of dashboard.
+  const isAnonymous = !!(user as any)?.is_anonymous
 
   // ── core data ──────────────────────────────────────────────────────────
   const [attemptId, setAttemptId] = useState<string | null>(null)
@@ -792,10 +796,10 @@ export default function TestShell() {
             </button>
             <button
               type="button"
-              onClick={() => navigate('/')}
+              onClick={() => navigate(isAnonymous ? '/login' : '/')}
               className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors"
             >
-              Back to Dashboard
+              {isAnonymous ? 'Back to Login' : 'Back to Dashboard'}
             </button>
           </div>
         </div>

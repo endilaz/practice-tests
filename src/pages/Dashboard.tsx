@@ -16,6 +16,9 @@ type TestAttempt = {
 export default function Dashboard() {
   const { role, user } = useAuth()
   const navigate = useNavigate()
+
+  // Anonymous users (guests who didn't register) have no persistent history.
+  const isAnonymous = !!(user as any)?.is_anonymous
   
   const [attempts, setAttempts] = useState<TestAttempt[]>([])
   const [loading, setLoading] = useState(true)
@@ -103,8 +106,8 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* Test History Section */}
-        <section>
+        {/* Test History Section — hidden for anonymous/guest sessions */}
+        {!isAnonymous && <section>
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold">Test History</h2>
             {attempts.length > 0 && (
@@ -213,7 +216,7 @@ export default function Dashboard() {
               </table>
             </div>
           )}
-        </section>
+        </section>}
       </main>
     </div>
   )

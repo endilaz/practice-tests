@@ -47,6 +47,7 @@ export default function Results() {
   const { id: attemptId } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { user, loading: authLoading } = useAuth()
+  const isAnonymous = !!(user as any)?.is_anonymous
 
   const [attempt, setAttempt] = useState<TestAttempt | null>(null)
   const [questionsData, setQuestionsData] = useState<QuestionWithData[]>([])
@@ -217,10 +218,10 @@ export default function Results() {
           <p className="text-gray-700">{error}</p>
           <button
             type="button"
-            onClick={() => navigate('/')}
+            onClick={() => navigate(isAnonymous ? '/login' : '/')}
             className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
           >
-            Back to Dashboard
+            {isAnonymous ? 'Back to Login' : 'Back to Dashboard'}
           </button>
         </div>
       </div>
@@ -249,10 +250,10 @@ export default function Results() {
           <h1 className="text-3xl font-bold text-gray-900">Test Results</h1>
           <button
             type="button"
-            onClick={() => navigate('/')}
+            onClick={() => navigate(isAnonymous ? '/login' : '/')}
             className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
           >
-            Back to Dashboard
+            {isAnonymous ? 'Back to Login' : 'Back to Dashboard'}
           </button>
         </div>
 
@@ -385,10 +386,10 @@ export default function Results() {
         <div className="flex justify-center pb-8">
           <button
             type="button"
-            onClick={() => navigate('/')}
+            onClick={() => navigate(isAnonymous ? '/login' : '/')}
             className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
           >
-            Back to Dashboard
+            {isAnonymous ? 'Back to Login' : 'Back to Dashboard'}
           </button>
         </div>
       </div>
