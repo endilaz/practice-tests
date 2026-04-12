@@ -53,7 +53,7 @@ export function TestConfigForm() {
       // no security boundary — RLS already allows all authenticated users
       // to read topics, so this only affects what appears in the selector).
       const filtered =
-        role === 'admin'
+        role !== null && role === 'admin'
           ? data
           : data.filter(t => !t.name.startsWith('[DEBUG]'))
       setTopics(filtered)

@@ -70,6 +70,11 @@ export default function Login() {
               className="border px-2 py-1 w-full rounded"
               required
             />
+            <div className="text-right mt-1">
+              <Link to="/forgot-password" className="text-xs text-blue-600 underline">
+                Forgot password?
+              </Link>
+            </div>
           </div>
 
           <button
@@ -87,6 +92,22 @@ export default function Login() {
             Register
           </Link>
         </p>
+    
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-200" />
+          </div>
+          <div className="relative flex justify-center text-xs text-gray-400 bg-white px-2">
+            or
+          </div>
+        </div>
+    
+        <Link
+          to="/guest"
+          className="block text-center text-sm text-gray-600 border border-gray-300 rounded px-4 py-2 hover:bg-gray-50 transition-colors"
+        >
+          Continue as Guest
+        </Link>
       </div>
     </div>
   )

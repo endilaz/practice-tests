@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { questionSchema, bulkImportSchema, type QuestionFormData, type BulkImportData } from './question.schema'
 import { useAuth } from '@/auth/useAuth'
 import { DocxImport } from './DocxImport'
+import { DocxImportFBLA } from './DocxImportStudyguides'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1274,7 +1275,10 @@ export default function QuestionsAdmin() {
                   </div>
                 </div>
               ) : (
-                <DocxImport />
+                <>
+                  <DocxImport />
+                  <DocxImportFBLA />
+                </>
               )}
             </div>
           </div>
