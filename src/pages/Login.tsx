@@ -70,6 +70,11 @@ export default function Login() {
               className="border px-2 py-1 w-full rounded"
               required
             />
+            <div className="text-right mt-1">
+              <Link to="/forgot-password" className="text-xs text-blue-600 underline">
+                Forgot password?
+              </Link>
+            </div>
           </div>
 
           <button

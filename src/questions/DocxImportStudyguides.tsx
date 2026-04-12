@@ -939,7 +939,7 @@ export function DocxImportFBLA() {
       setParseResult(result)
       // Initialize editable raw text from the extracted lines.
       // Joining with newlines lets the user see and edit one line per row.
-      setRawText(result.rawLines.join('\n'))
+      setRawText(result.rawLines.join('\\n'))
       setRawEditorOpen(false)
       setStep('review')
     } catch (err: unknown) {
@@ -1066,7 +1066,7 @@ export function DocxImportFBLA() {
    */
   function handleReparse() {
     setError(null)
-    const lines = rawText.split('\n')
+    const lines = rawText.split('\\n')
 
     let result: ParseResult
     try {
@@ -1429,8 +1429,8 @@ export function DocxImportFBLA() {
                       <div className="px-4 py-2 max-h-32 overflow-y-auto space-y-1">
                         {live
                           .filter(q => q.issues.some(i => i !== 'No answer in key'))
-                          .map(q => (
-                            <div key={q.questionNumber} className="text-xs text-gray-600">
+                          .map((q, idx) => (
+                            <div key={`${normName}-issue-${q.questionNumber}-${idx}`} className="text-xs text-gray-600">
                               <span className="font-mono text-orange-500 mr-1">Q{q.questionNumber}</span>
                               {q.issues.filter(i => i !== 'No answer in key').join('; ')}
                             </div>
@@ -1457,14 +1457,14 @@ export function DocxImportFBLA() {
                               All questions have been deleted.
                             </p>
                           )}
-                          {live.map(q => {
+                          {live.map((q, idx) => {
                             // Issues still relevant after any edits
                             const activeIssues = q.issues.filter(
                               i => i !== 'No answer in key' || !q.correctAnswer
                             )
                             return (
                               <div
-                                key={q.questionNumber}
+                                key={`${normName}-q-${q.questionNumber}-${idx}`}
                                 className={`px-4 py-3 space-y-2 ${activeIssues.length > 0 ? 'bg-red-50/40' : ''}`}
                               >
                                 {/* Row: question number + correct-answer selector + delete */}
@@ -1631,11 +1631,11 @@ export function DocxImportFBLA() {
                 />
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-xs text-gray-400">
-                    {rawText.split('\n').length} lines · {rawText.length} chars
+                    {rawText.split('\\n').length} lines · {rawText.length} chars
                   </span>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => setRawText(parseResult.rawLines.join('\n'))}
+                      onClick={() => setRawText(parseResult.rawLines.join('\\n'))}
                       className="px-3 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                       title="Discard edits and restore the original extracted text"
                     >

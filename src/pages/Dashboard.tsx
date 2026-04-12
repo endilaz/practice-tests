@@ -82,6 +82,9 @@ export default function Dashboard() {
               Admin
             </Link>
           )}
+          <Link to="/change-password" className="text-sm text-blue-600 underline">
+            Change Password
+          </Link>
           <button
             onClick={() => supabase.auth.signOut()}
             className="text-sm text-gray-600 underline"
