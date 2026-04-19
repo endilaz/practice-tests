@@ -315,7 +315,7 @@ export default function PracticeShell() {
                 >
                   {selectedChoiceObj?.is_correct
                     ? '✓ Correct!'
-                    : `✗ Incorrect. The correct answer is ${correctChoice?.choice_letter}.`}
+                    : `✗ Incorrect. The correct answer is highlighted.`}
                 </p>
               </div>
 
