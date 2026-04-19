@@ -34,7 +34,7 @@ type AnswerChoice = {
 
 type QuestionFeedback = {
   id: string
-  user_email: string
+  user_id: string
   difficulty_rating: number | null
   quality_rating: number | null
   feedback_text: string | null
@@ -147,7 +147,7 @@ export default function QuestionsAdmin() {
       // When feedbackOnly is on, !inner on question_feedback restricts to questions
       // that have at least one feedback row — the join filters rather than expands
       // because we don't select any feedback columns.
-      const feedbackJoin = feedbackOnly ? ', question_feedback!inner(id)' : ''
+      const feedbackJoin = feedbackOnly ? ', question_feedback!inner(question_id)' : ''
       let query = supabase
         .from('questions')
         .select(`id, topic_id, question_text, explanation_text, difficulty_level, created_at, topics!inner(name)${feedbackJoin}`, { count: 'exact' })
@@ -329,7 +329,11 @@ export default function QuestionsAdmin() {
     if (qError) throw qError
 
     // Replace choices: delete then re-insert
-    await supabase.from('answer_choices').delete().eq('question_id', id)
+    const { error: dError } = await supabase
+     .from('answer_choices')
+     .delete()
+     .eq('question_id', id)
+    if (dError) throw new Error(`Failed to clear existing choices: ${dError.message}`)
 
     const choicesData = data.choices.map(c => ({
       question_id: id,
@@ -369,8 +373,7 @@ export default function QuestionsAdmin() {
     try {
       const { data, error: fbErr } = await supabase
         .from('question_feedback')
-        .select('id, difficulty_rating, quality_rating, feedback_text, created_at, users!inner(email)')
-        .eq('question_id', question.id)
+        .select('id, question_id, user_id, difficulty_rating, quality_rating, feedback_text, created_at')
         .order('created_at', { ascending: false })
 
       if (fbErr) throw fbErr
@@ -378,13 +381,14 @@ export default function QuestionsAdmin() {
       setFeedbackItems(
         (data || []).map((f: any) => ({
           id: f.id,
-          user_email: f.users?.email || 'Unknown',
+          user_id: f.user_id ?? 'Unknown',
           difficulty_rating: f.difficulty_rating,
           quality_rating: f.quality_rating,
           feedback_text: f.feedback_text,
           created_at: f.created_at,
         }))
       )
+      console.log('feedback data:', data, 'error:', fbErr)
     } catch (err: any) {
       console.error('Load feedback error:', err)
     } finally {

@@ -1,0 +1,1 @@
+fix practiceshell 318: letter is randomized but 
