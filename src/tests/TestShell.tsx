@@ -293,6 +293,9 @@ export default function TestShell() {
   const responsesRef = useRef<ResponseRow[]>([])
   responsesRef.current = responses
 
+  // Ref for the palette scroll container — used to auto-scroll the active button into view.
+  const paletteRef = useRef<HTMLDivElement>(null)
+
   // ---------------------------------------------------------------------------
   // Read attemptId from URL on mount
   // ---------------------------------------------------------------------------
@@ -447,6 +450,13 @@ export default function TestShell() {
     document.addEventListener('visibilitychange', onVisibilityChange)
     return () => document.removeEventListener('visibilitychange', onVisibilityChange)
   }, [attemptId, loading, submitted, questions])
+
+  // Auto-scroll the active palette button into view whenever currentIndex changes.
+  useEffect(() => {
+    if (!paletteRef.current) return
+    const activeBtn = paletteRef.current.querySelector<HTMLElement>('[data-palette-active="true"]')
+    activeBtn?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+  }, [currentIndex])
 
   // ---------------------------------------------------------------------------
   // Persistence helpers
@@ -898,38 +908,49 @@ export default function TestShell() {
         </div>
       </main>
 
-      {/* ── question palette (always visible) ───────────────────────────────── */}
-      <footer className="bg-white border-t border-gray-200 px-6 py-3">
-        <div className="max-w-3xl mx-auto flex flex-wrap gap-2">
-          {questions.map((q, i) => {
-            const isCurrentInSingleView = i === currentIndex && viewMode !== 'all'
-            const isMarked = responses.find(r => r.question_id === q.id)?.marked_for_review
-            // In review mode, unmarked questions are not navigable
-            const blocked = viewMode === 'review' && !isMarked
+      {/* ── question palette (always visible, horizontally scrollable) ──────── */}
+      <footer className="bg-white border-t border-gray-200 py-3">
+        {/*
+          Width matches the question card area (max-w-3xl, px-6 gutter on each side).
+          overflow-x-auto + flex-nowrap keeps all buttons in a single scrollable row.
+          scrollbar-thin styling via native CSS — no plugin needed.
+        */}
+        <div className="max-w-3xl mx-auto px-6">
+          <div
+            ref={paletteRef}
+            className="flex gap-2 overflow-x-auto pb-1"
+            style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 transparent' }}
+          >
+            {questions.map((q, i) => {
+              const isCurrentInSingleView = i === currentIndex && viewMode !== 'all'
+              const isMarked = responses.find(r => r.question_id === q.id)?.marked_for_review
+              const blocked = viewMode === 'review' && !isMarked
 
-            return (
-              <button
-                key={q.id}
-                type="button"
-                onClick={() => {
-                  if (blocked) return
-                  setCurrentIndex(i)
-                  if (viewMode === 'all') {
-                    document.getElementById(`q-${q.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                  }
-                }}
-                className={[
-                  'w-9 h-9 rounded-lg text-sm font-semibold border-2 transition-colors',
-                  paletteClass(q.id),
-                  blocked ? 'opacity-35 cursor-not-allowed' : 'cursor-pointer hover:opacity-80',
-                ].join(' ')}
-                style={isCurrentInSingleView ? { borderColor: NAVY } : { borderColor: 'transparent' }}
-                title={`Question ${i + 1}`}
-              >
-                {i + 1}
-              </button>
-            )
-          })}
+              return (
+                <button
+                  key={q.id}
+                  type="button"
+                  data-palette-active={isCurrentInSingleView ? 'true' : 'false'}
+                  onClick={() => {
+                    if (blocked) return
+                    setCurrentIndex(i)
+                    if (viewMode === 'all') {
+                      document.getElementById(`q-${q.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                    }
+                  }}
+                  className={[
+                    'w-9 h-9 flex-shrink-0 rounded-lg text-sm font-semibold border-2 transition-colors',
+                    paletteClass(q.id),
+                    blocked ? 'opacity-35 cursor-not-allowed' : 'cursor-pointer hover:opacity-80',
+                  ].join(' ')}
+                  style={isCurrentInSingleView ? { borderColor: NAVY } : { borderColor: 'transparent' }}
+                  title={`Question ${i + 1}`}
+                >
+                  {i + 1}
+                </button>
+              )
+            })}
+          </div>
         </div>
       </footer>
 

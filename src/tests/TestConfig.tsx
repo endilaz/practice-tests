@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useNavigate } from 'react-router-dom'
-import { testConfigSchema } from './test.schema'
+import { testConfigSchema, MAX_QUESTIONS } from './test.schema'
 import { useAuth } from '@/auth/useAuth'
 
 type Topic = {
@@ -9,15 +9,44 @@ type Topic = {
   name: string
 }
 
+// Key used for sessionStorage persistence — scoped to avoid collisions.
+const STORAGE_KEY = 'fbla_test_config'
+
+type PersistedConfig = {
+  topicId: string
+  questionCount: string
+  useTimer: boolean
+  minutes: string
+  practiceMode: boolean
+}
+
+function loadPersistedConfig(): Partial<PersistedConfig> {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY)
+    return raw ? (JSON.parse(raw) as PersistedConfig) : {}
+  } catch {
+    return {}
+  }
+}
+
+function persistConfig(cfg: PersistedConfig) {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(cfg))
+  } catch {
+    // sessionStorage unavailable (private browsing quota, etc.) — fail silently
+  }
+}
+
 export function TestConfigForm() {
   const { role, loading: authLoading } = useAuth()
 
   const [topics, setTopics] = useState<Topic[]>([])
-  const [topicId, setTopicId] = useState('')
-  const [questionCount, setQuestionCount] = useState('25')
-  const [useTimer, setUseTimer] = useState(false)
-  const [minutes, setMinutes] = useState('30')
-  const [practiceMode, setPracticeMode] = useState(false)
+  const [_persisted] = useState(loadPersistedConfig)   // read once on mount
+  const [topicId, setTopicId] = useState(_persisted.topicId ?? '')
+  const [questionCount, setQuestionCount] = useState(_persisted.questionCount ?? '25')
+  const [useTimer, setUseTimer] = useState(_persisted.useTimer ?? false)
+  const [minutes, setMinutes] = useState(_persisted.minutes ?? '30')
+  const [practiceMode, setPracticeMode] = useState(_persisted.practiceMode ?? false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -39,6 +68,13 @@ export function TestConfigForm() {
       setAvailableQuestions(0)
     }
   }, [topicId])
+
+  // Persist form state to sessionStorage whenever any field changes.
+  // topicId is stored but re-validated against the live topic list on next load,
+  // so a deleted topic simply won't match the <select> and will show blank.
+  useEffect(() => {
+    persistConfig({ topicId, questionCount, useTimer, minutes, practiceMode })
+  }, [topicId, questionCount, useTimer, minutes, practiceMode])
 
   async function loadTopics() {
     const { data, error } = await supabase
@@ -189,7 +225,7 @@ export function TestConfigForm() {
         <input
           type="number"
           min={practiceMode ? 0 : 1}
-          max={100}
+          max={MAX_QUESTIONS}
           value={questionCount}
           onChange={e => handleQuestionCountChange(e.target.value)}
           className="border px-2 py-1 w-full"
@@ -199,7 +235,7 @@ export function TestConfigForm() {
         <p className="text-xs text-gray-500 mt-1">
           {practiceMode
             ? 'Enter 0 for infinite practice mode'
-            : 'Maximum 100 questions per test'}
+            : `Maximum ${MAX_QUESTIONS} questions per test`}
         </p>
       </div>
 
