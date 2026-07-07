@@ -1,8 +1,8 @@
+# Secrets
 credentials.*
-token.json
-*.txt
 token.*
 .env.local
+.env*.local
 
 # Logs
 logs
@@ -16,8 +16,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
-*.
 .vite
+*.tsbuildinfo
 
 # Editor directories and files
 .vscode/*
