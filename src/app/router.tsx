@@ -7,6 +7,9 @@
  * Guest routes   – anonymous session allowed: /test/:id, /results/:id
  * Auth routes    – full (non-anonymous) session required: /, /change-password
  * Admin routes   – admin role required: /admin
+ * Fallbacks      – '*' renders NotFound; a pathless parent route carries
+ *                  errorElement so render errors show RouteError instead of
+ *                  a blank page.
  */
 import { createBrowserRouter } from 'react-router-dom'
 import { ProtectedRoute } from '@/auth/ProtectedRoute'
@@ -21,8 +24,13 @@ import ForgotPassword from '@/pages/ForgotPassword'
 import ResetPassword from '@/pages/ResetPassword'
 import ChangePassword from '@/pages/ChangePassword'
 import GuestLanding from '@/pages/GuestLanding'
+import NotFound from '@/pages/NotFound'
+import RouteError from '@/pages/RouteError'
 
 export const router = createBrowserRouter([
+  {
+  errorElement: <RouteError />,
+  children: [
   // ── public ──────────────────────────────────────────────────────────────
   { path: '/login',           element: <Login /> },
   { path: '/register',        element: <Register /> },
@@ -86,5 +94,10 @@ export const router = createBrowserRouter([
         <Admin />
       </ProtectedRoute>
     ),
+  },
+
+  // ── catch-all 404 ────────────────────────────────────────────────────────
+  { path: '*', element: <NotFound /> },
+  ],
   },
 ])
