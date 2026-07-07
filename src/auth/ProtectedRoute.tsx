@@ -15,6 +15,7 @@
  *   non-admin + requireAdmin → /
  *   otherwise              → render children
  */
+import type { ReactElement } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from './useAuth'
 
@@ -23,7 +24,7 @@ export function ProtectedRoute({
   requireAdmin = false,
   allowGuest = false,
 }: {
-  children: JSX.Element
+  children: ReactElement
   requireAdmin?: boolean
   allowGuest?: boolean
 }) {

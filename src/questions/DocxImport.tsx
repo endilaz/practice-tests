@@ -136,8 +136,6 @@ export function DocxImport() {
       
       // Check if this looks like an answer key entry
       if (/^\d+\)$/.test(line)) {
-        const qNum = parseInt(line.replace(')', ''))
-        
         // Check next line is a single letter A-D
         if (i + 1 < lines.length && /^[A-D]$/.test(lines[i + 1].trim())) {
           answerKeyStartIdx = i

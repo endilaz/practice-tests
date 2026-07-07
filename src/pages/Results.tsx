@@ -95,7 +95,9 @@ export default function Results() {
         return
       }
 
-      setAttempt(attemptData as TestAttempt)
+      // Cast via unknown: supabase-js infers the to-one topics embed as an
+      // array without generated DB types; PostgREST returns an object.
+      setAttempt(attemptData as unknown as TestAttempt)
 
       // 2. Load attempt_questions to get position ordering
       const { data: attemptQuestionsData, error: aqError } = await supabase
@@ -294,8 +296,6 @@ export default function Results() {
 
           {questionsData.map((item, index) => {
             const orderedChoices = orderChoices(item.response, item.choices)
-            const userChoice = item.choices.find(c => c.id === item.response.selected_choice_id)
-            const correctChoice = item.choices.find(c => c.is_correct)
 
             return (
               <div key={item.question.id} className="bg-white rounded-xl shadow-lg p-6 space-y-4">

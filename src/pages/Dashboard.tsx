@@ -48,7 +48,10 @@ export default function Dashboard() {
 
       if (fetchError) throw fetchError
 
-      setAttempts(data as TestAttempt[])
+      // Cast via unknown: without generated DB types, supabase-js infers the
+      // to-one topics(name) embed as an array even though PostgREST returns
+      // an object for FK relations.
+      setAttempts(data as unknown as TestAttempt[])
     } catch (err: any) {
       console.error('Load test history error:', err)
       setError(err.message || 'Failed to load test history')

@@ -13,14 +13,13 @@
  * Dashboard does for logged-in users.
  */
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { TestConfigForm } from '@/tests/TestConfig'
 
 type PageState = 'signing-in' | 'ready' | 'error'
 
 export default function GuestLanding() {
-  const navigate = useNavigate()
   const [pageState, setPageState] = useState<PageState>('signing-in')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
