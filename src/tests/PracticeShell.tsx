@@ -24,6 +24,17 @@ type QuestionWithChoices = {
 
 const DISPLAY_LABELS = ['A', 'B', 'C', 'D'] as const
 
+// Fisher-Yates — sort(() => Math.random() - 0.5) is biased and can leave
+// items near their original positions far more often than chance.
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
 export default function PracticeShell() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -33,10 +44,11 @@ export default function PracticeShell() {
   const [questionIndex, setQuestionIndex] = useState(0) // Track progress in infinite mode
   const [selectedChoice, setSelectedChoice] = useState<string | null>(null)
   const [isSubmitted, setIsSubmitted] = useState(false)
+  const [correctCount, setCorrectCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [topicName, setTopicName] = useState('')
-  const [topicId, setTopicId] = useState('')
   const [isInfinite, setIsInfinite] = useState(false)
 
   useEffect(() => {
@@ -51,7 +63,6 @@ export default function PracticeShell() {
 
     const questionCount = parseInt(count, 10)
     setIsInfinite(questionCount === 0)
-    setTopicId(topic)
     loadPracticeQuestions(topic, questionCount)
   }, [searchParams])
 
@@ -100,9 +111,7 @@ export default function PracticeShell() {
       // Combine and randomize choice order per question
       const combined: QuestionWithChoices[] = questionsData.map(q => {
         const qChoices = (choicesData || []).filter(c => c.question_id === q.id)
-        const displayOrder = [...qChoices]
-          .sort(() => Math.random() - 0.5)
-          .map(c => c.choice_letter)
+        const displayOrder = shuffle(qChoices).map(c => c.choice_letter)
 
         return {
           question: q as Question,
@@ -111,14 +120,16 @@ export default function PracticeShell() {
         }
       })
 
-      // Shuffle the entire pool
-      const shuffled = [...combined].sort(() => Math.random() - 0.5)
+      // Shuffle the pool, then cap it at the requested count in finite mode
+      // (count = 0 means infinite: cycle through the whole topic).
+      const shuffled = shuffle(combined)
+      setQuestionPool(count > 0 ? shuffled.slice(0, count) : shuffled)
 
-      setQuestionPool(shuffled)
-      
-      // Show warning if finite mode and fewer questions than requested
+      // Non-blocking notice if finite mode and fewer questions than requested.
+      // Must NOT go through setError — that renders the full error screen and
+      // would lock the student out of practicing with the smaller pool.
       if (count > 0 && shuffled.length < count) {
-        setError(`Note: Only ${shuffled.length} questions available (you requested ${count})`)
+        setNotice(`Only ${shuffled.length} questions available (you requested ${count}).`)
       }
     } catch (err: any) {
       console.error('Load practice questions error:', err)
@@ -135,11 +146,21 @@ export default function PracticeShell() {
 
   function handleSubmit() {
     if (!selectedChoice || isSubmitted) return
+    const choice = currentQuestion?.choices.find(c => c.id === selectedChoice)
+    if (choice?.is_correct) setCorrectCount(n => n + 1)
     setIsSubmitted(true)
   }
 
   function handleNext() {
     setQuestionIndex(questionIndex + 1)
+    setSelectedChoice(null)
+    setIsSubmitted(false)
+  }
+
+  function handleRestart() {
+    setQuestionPool(prev => shuffle(prev))
+    setQuestionIndex(0)
+    setCorrectCount(0)
     setSelectedChoice(null)
     setIsSubmitted(false)
   }
@@ -184,12 +205,46 @@ export default function PracticeShell() {
     )
   }
 
+  // Finite mode: past the last question — show the summary screen
+  if (!isInfinite && questionIndex >= questionPool.length) {
+    const pct = Math.round((correctCount / questionPool.length) * 100)
+    return (
+      <div className="min-h-screen bg-blue-600 flex items-center justify-center px-4">
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center space-y-6">
+          <h2 className="text-2xl font-bold text-gray-900">Practice Complete!</h2>
+          <p className="text-gray-600">{topicName}</p>
+          <div className="py-4">
+            <p className="text-5xl font-bold text-blue-600">{pct}%</p>
+            <p className="text-gray-600 mt-2">
+              {correctCount} of {questionPool.length} correct
+            </p>
+          </div>
+          <div className="flex gap-3 justify-center">
+            <button
+              type="button"
+              onClick={handleRestart}
+              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              Practice Again
+            </button>
+            <button
+              type="button"
+              onClick={handleExit}
+              className="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 transition-colors font-medium"
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const orderedChoices = currentQuestion.displayOrder
     .map(letter => currentQuestion.choices.find(c => c.choice_letter === letter))
     .filter((c): c is AnswerChoice => c !== undefined)
 
   const selectedChoiceObj = currentQuestion.choices.find(c => c.id === selectedChoice)
-  const correctChoice = currentQuestion.choices.find(c => c.is_correct)
 
   return (
     <div className="min-h-screen bg-blue-600">
@@ -212,6 +267,11 @@ export default function PracticeShell() {
 
       {/* Question Card */}
       <div className="max-w-4xl mx-auto px-4 py-8">
+        {notice && (
+          <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
+            {notice}
+          </div>
+        )}
         <div className="bg-white rounded-xl shadow-lg p-8 space-y-6">
           {/* Progress */}
           <div className="text-sm text-gray-600">
@@ -265,7 +325,7 @@ export default function PracticeShell() {
                   type="button"
                   onClick={() => handleChoiceSelect(choice.id)}
                   disabled={isSubmitted}
-                  className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${bgColor} ${borderColor} ${cursor} hover:bg-blue-50 disabled:hover:${bgColor}`}
+                  className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${bgColor} ${borderColor} ${cursor} ${!isSubmitted ? 'hover:bg-blue-50' : ''}`}
                 >
                   <div className="flex items-start gap-3">
                     <span className={`font-bold ${textColor} min-w-[24px]`}>
@@ -337,7 +397,9 @@ export default function PracticeShell() {
               disabled={!isSubmitted}
               className="bg-blue-600 text-white px-6 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors font-medium"
             >
-              Next Question →
+              {!isInfinite && questionIndex === questionPool.length - 1
+                ? 'Finish →'
+                : 'Next Question →'}
             </button>
           </div>
         </div>
