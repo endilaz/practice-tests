@@ -1,0 +1,4324 @@
+import { useState } from 'react'
+import { TopicsAdmin } from '@/topics/TopicsAdmin'
+import QuestionsAdmin from '@/questions/QuestionsAdmin'
+import QuestionAnalytics from '@/analytics/QuestionAnalytics'
+import UserAnalytics from '@/analytics/UserAnalytics'
+
+type Tab = 'topics' | 'questions' | 'analytics'
+
+export default function Admin() {
+  const [activeTab, setActiveTab] = useState<Tab>('topics')
+  const [analyticsView, setAnalyticsView] = useState<'questions' | 'users'>('questions')
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <h1 className="text-2xl font-bold text-gray-900">Admin Panel</h1>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <nav className="flex space-x-8">
+            <button
+              onClick={() => setActiveTab('topics')}
+              className={[
+                'py-4 px-1 border-b-2 font-medium text-sm transition-colors',
+                activeTab === 'topics'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+              ].join(' ')}
+            >
+              Topics
+            </button>
+            <button
+              onClick={() => setActiveTab('questions')}
+              className={[
+                'py-4 px-1 border-b-2 font-medium text-sm transition-colors',
+                activeTab === 'questions'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+              ].join(' ')}
+            >
+              Questions
+            </button>
+            <button
+              onClick={() => setActiveTab('analytics')}
+              className={[
+                'py-4 px-1 border-b-2 font-medium text-sm transition-colors',
+                activeTab === 'analytics'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+              ].join(' ')}
+            >
+              Analytics
+            </button>
+          </nav>
+        </div>
+      </div>
+
+      {/* Tab Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {activeTab === 'topics' && <TopicsAdmin />}
+        {activeTab === 'questions' && <QuestionsAdmin />}
+        {activeTab === 'analytics' && (
+          <div className="space-y-6">
+            {/* Analytics Sub-tabs */}
+            <div className="flex gap-4 border-b border-gray-200 pb-4">
+              <button
+                onClick={() => setAnalyticsView('questions')}
+                className={[
+                  'px-4 py-2 rounded-lg font-medium text-sm transition-colors',
+                  analyticsView === 'questions'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
+                ].join(' ')}
+              >
+                Question Analytics
+              </button>
+              <button
+                onClick={() => setAnalyticsView('users')}
+                className={[
+                  'px-4 py-2 rounded-lg font-medium text-sm transition-colors',
+                  analyticsView === 'users'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
+                ].join(' ')}
+              >
+                User Analytics
+              </button>
+            </div>
+
+            {/* Analytics Content */}
+            {analyticsView === 'questions' && <QuestionAnalytics />}
+            {analyticsView === 'users' && <UserAnalytics />}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}import { useState } from 'react'
+import { TopicsAdmin } from '@/topics/TopicsAdmin'
+import QuestionsAdmin from '@/questions/QuestionsAdmin'
+import QuestionAnalytics from '@/analytics/QuestionAnalytics'
+import UserAnalytics from '@/analytics/UserAnalytics'
+
+type Tab = 'topics' | 'questions' | 'analytics'
+
+export default function Admin() {
+  const [activeTab, setActiveTab] = useState<Tab>('topics')
+  const [analyticsView, setAnalyticsView] = useState<'questions' | 'users'>('questions')
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <h1 className="text-2xl font-bold text-gray-900">Admin Panel</h1>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <nav className="flex space-x-8">
+            <button
+              onClick={() => setActiveTab('topics')}
+              className={[
+                'py-4 px-1 border-b-2 font-medium text-sm transition-colors',
+                activeTab === 'topics'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+              ].join(' ')}
+            >
+              Topics
+            </button>
+            <button
+              onClick={() => setActiveTab('questions')}
+              className={[
+                'py-4 px-1 border-b-2 font-medium text-sm transition-colors',
+                activeTab === 'questions'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+              ].join(' ')}
+            >
+              Questions
+            </button>
+            <button
+              onClick={() => setActiveTab('analytics')}
+              className={[
+                'py-4 px-1 border-b-2 font-medium text-sm transition-colors',
+                activeTab === 'analytics'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+              ].join(' ')}
+            >
+              Analytics
+            </button>
+          </nav>
+        </div>
+      </div>
+
+      {/* Tab Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {activeTab === 'topics' && <TopicsAdmin />}
+        {activeTab === 'questions' && <QuestionsAdmin />}
+        {activeTab === 'analytics' && (
+          <div className="space-y-6">
+            {/* Analytics Sub-tabs */}
+            <div className="flex gap-4 border-b border-gray-200 pb-4">
+              <button
+                onClick={() => setAnalyticsView('questions')}
+                className={[
+                  'px-4 py-2 rounded-lg font-medium text-sm transition-colors',
+                  analyticsView === 'questions'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
+                ].join(' ')}
+              >
+                Question Analytics
+              </button>
+              <button
+                onClick={() => setAnalyticsView('users')}
+                className={[
+                  'px-4 py-2 rounded-lg font-medium text-sm transition-colors',
+                  analyticsView === 'users'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
+                ].join(' ')}
+              >
+                User Analytics
+              </button>
+            </div>
+
+            {/* Analytics Content */}
+            {analyticsView === 'questions' && <QuestionAnalytics />}
+            {analyticsView === 'users' && <UserAnalytics />}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}import { useState } from 'react'
+import { TopicsAdmin } from '@/topics/TopicsAdmin'
+import QuestionsAdmin from '@/questions/QuestionsAdmin'
+import QuestionAnalytics from '@/analytics/QuestionAnalytics'
+import UserAnalytics from '@/analytics/UserAnalytics'
+
+type Tab = 'topics' | 'questions' | 'analytics'
+
+export default function Admin() {
+  const [activeTab, setActiveTab] = useState<Tab>('topics')
+  const [analyticsView, setAnalyticsView] = useState<'questionsimport { RouterProvider } from 'react-router-dom'
+import { router } from '@/app/router'
+
+export function App() {
+  return <RouterProvider router={router} />
+}
+import { createContext, useContext, useEffect, useState } from 'react'
+import { type User } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase'
+
+type Role = 'user' | 'admin'
+
+type AuthContextValue = {
+  user: User | null
+  role: Role | null
+  loading: boolean
+}
+
+const AuthContext = createContext<AuthContextValue | undefined>(undefined)
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null)
+  const [role, setRole] = useState<Role | null>(null)
+  // loading is true until BOTH user and role are resolved for the first
+  // time. ProtectedRoute must not render anything until this is false.
+  const [loading, setLoading] = useState(true)
+
+  // Session bootstrap.
+  // getSession() and onAuthStateChange() are both async and Supabase does
+  // not guarantee which fires first. We use a ref-style flag (via closure)
+  // to ensure user is set exactly once during the initial resolution,
+  // regardless of which callback wins. The flag is scoped to the effect
+  // so it resets correctly if the effect ever re-runs (it won't, because
+  // the dependency array is empty, but this keeps the logic self-contained).
+  useEffect(() => {
+    let settled = false
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!settled) {
+        settled = true
+        setUser(data.session?.user ?? null)
+      }
+    })
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!settled) {
+        // First resolution: set user and let the role effect handle the rest.
+        settled = true
+        setUser(session?.user ?? null)
+      } else {
+        // Subsequent changes (login, logout, token refresh): update user
+        // directly. Role effect will re-fire because user changed.
+        setUser(session?.user ?? null)
+      }
+    })
+
+    return () => sub.subscription.unsubscribe()
+  }, [])
+
+  // Role resolution.
+  // Runs whenever user changes. When user becomes non-null, fetches role
+  // from the database (never from the JWT — the JWT does not contain role).
+  // Sets loading to false only after role is resolved or confirmed null.
+  // This means ProtectedRoute will not see loading=false until we have
+  // both a definitive user value AND a definitive role value.
+  useEffect(() => {
+    if (!user) {
+      setRole(null)
+      setLoading(false) // No user means we're done resolving.
+      return
+    }
+
+    supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Failed to fetch role:', error)
+          setRole(null)
+        } else {
+          setRole(data.role as Role)
+        }
+        setLoading(false) // Resolution complete: role is set (or null on error).
+      })
+  }, [user])
+
+  return (
+    <AuthContext.Provider value={{ user, role, loading }}>
+      {children}
+    </AuthContext.Provider>
+  )
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext)
+  if (!ctx) {
+    throw new Error('useAuth must be used within AuthProvider')
+  }
+  return ctx
+}
+import { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { TestConfigForm } from '@/tests/TestConfig'
+import { useAuth } from '@/auth/useAuth'
+import { supabase } from '@/lib/supabase'
+
+type TestAttempt = {
+  id: string
+  completed_at: string
+  score: number
+  total_possible: number
+  total_time_seconds: number
+  topics: { name: string } | null
+}
+
+export default function Dashboard() {
+  const { role, user } = useAuth()
+  const navigate = useNavigate()
+  
+  const [attempts, setAttempts] = useState<TestAttempt[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [historyLimit, setHistoryLimit] = useState(10)
+
+  useEffect(() => {
+    if (user) {
+      loadTestHistory()
+    }
+  }, [user, historyLimit])
+
+  async function loadTestHistory() {
+    if (!user) return
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('test_attempts')
+        .select('id, completed_at, score, total_possible, total_time_seconds, topics(name)')
+        .eq('user_id', user.id)
+        .not('completed_at', 'is', null)
+        .order('completed_at', { ascending: false })
+        .limit(historyLimit)
+
+      if (fetchError) throw fetchError
+
+      setAttempts(data as TestAttempt[])
+    } catch (err: any) {
+      console.error('Load test history error:', err)
+      setError(err.message || 'Failed to load test history')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function formatTime(seconds: number): string {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  function formatDate(dateString: string): string {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+  }
+
+  function calculatePercentage(score: number, total: number): number {
+    return total > 0 ? Math.round((score / total) * 100) : 0
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white shadow px-4 py-3 flex justify-between items-center">
+        <h1 className="text-lg font-semibold">FBLA Practice Tests</h1>
+        <div className="flex items-center gap-4">
+          {role === 'admin' && (
+            <Link to="/admin" className="text-sm text-blue-600 underline">
+              Admin
+            </Link>
+          )}
+          <button
+            onClick={() => supabase.auth.signOut()}
+            className="text-sm text-gray-600 underline"
+          >
+            Log Out
+          </button>
+        </div>
+      </header>
+
+      <main className="max-w-6xl mx-auto mt-10 px-4 space-y-10">
+        {/* Test Config Section */}
+        <section>
+          <h2 className="text-xl font-bold mb-6">Start a Practice Test</h2>
+          <div className="max-w-md">
+            <TestConfigForm />
+          </div>
+        </section>
+
+        {/* Test History Section */}
+        <section>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold">Test History</h2>
+            {attempts.length > 0 && (
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600">Show:</label>
+                <select
+                  value={historyLimit}
+                  onChange={e => setHistoryLimit(Number(e.target.value))}
+                  className="border border-gray-300 rounded px-2 py-1 text-sm"
+                >
+                  <option value={5}>5 tests</option>
+                  <option value={10}>10 tests</option>
+                  <option value={20}>20 tests</option>
+                  <option value={50}>50 tests</option>
+                  <option value={100}>100 tests</option>
+                </select>
+              </div>
+            )}
+          </div>
+          
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
+              {error}
+            </div>
+          )}
+
+          {loading ? (
+            <div className="bg-white rounded-lg shadow p-8 text-center">
+              <p className="text-gray-600">Loading test history...</p>
+            </div>
+          ) : attempts.length === 0 ? (
+            <div className="bg-white rounded-lg shadow p-8 text-center">
+              <p className="text-gray-500 mb-2">No test history yet</p>
+              <p className="text-sm text-gray-400">
+                Complete a test to see your results here
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Topic
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Score
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Time
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {attempts.map(attempt => {
+                    const percentage = calculatePercentage(attempt.score, attempt.total_possible)
+                    
+                    return (
+                      <tr key={attempt.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {formatDate(attempt.completed_at)}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          <span className="line-clamp-1">
+                            {attempt.topics?.name || 'Unknown Topic'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-900">
+                              {attempt.score}/{attempt.total_possible}
+                            </span>
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                              percentage >= 70 
+                                ? 'bg-green-100 text-green-800' 
+                                : percentage >= 50 
+                                ? 'bg-yellow-100 text-yellow-800' 
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {percentage}%
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {formatTime(attempt.total_time_seconds)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/results/${attempt.id}`)}
+                            className="text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            View Results
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </main>
+    </div>
+  )
+}// Reads required environment variables at module load time.
+// Throws immediately with a clear message if any are missing.
+// This surfaces configuration errors at startup rather than
+// letting them propagate as opaque network failures later.
+
+function requireEnv(name: string): string {
+  const value = import.meta.env[name]
+  if (!value) {
+    throw new Error(
+      `Missing required environment variable: ${name}\n` +
+      `Add it to .env.local in your project root.`
+    )
+  }
+  return value
+}
+
+export const env = {
+  VITE_SUPABASE_URL: requireEnv('VITE_SUPABASE_URL'),
+  VITE_SUPABASE_ANON_KEY: requireEnv('VITE_SUPABASE_ANON_KEY'),
+}
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { supabase } from '@/lib/supabase'
+
+export default function Login() {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const navigate = useNavigate()
+
+  async function handleSubmit(e?: React.FormEvent) {
+    e?.preventDefault()
+    if (loading) return
+    setError(null)
+
+    const trimmedEmail = email.trim()
+    const trimmedPassword = password.trim()
+
+    if (!trimmedEmail || !trimmedPassword) {
+      setError('Email and password are required.')
+      return
+    }
+
+    setLoading(true)
+
+    const { error } = await supabase.auth.signInWithPassword({ 
+      email: trimmedEmail, 
+      password: trimmedPassword 
+    })
+
+    if (error) {
+      setError(error.message)
+      setLoading(false)
+    } else {
+      // Success: navigate to dashboard. AuthProvider's onAuthStateChange
+      // will detect the new session and set user + role. By the time
+      // ProtectedRoute renders, loading will resolve and Dashboard appears.
+      navigate('/')
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="w-full max-w-sm bg-white p-8 rounded shadow space-y-4">
+        <h1 className="text-2xl font-bold text-center">Log In</h1>
+
+        {error && <p className="text-red-600 text-sm">{error}</p>}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Email</label>
+            <input
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={e => { setEmail(e.target.value); setError(null) }}
+              className="border px-2 py-1 w-full rounded"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Password</label>
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={e => { setPassword(e.target.value); setError(null) }}
+              className="border px-2 py-1 w-full rounded"
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="bg-blue-600 text-white px-4 py-2 w-full rounded disabled:opacity-50"
+          >
+            {loading ? 'Logging in...' : 'Log In'}
+          </button>
+        </form>
+
+        <p className="text-sm text-center text-gray-600">
+          No account?{' '}
+          <Link to="/register" className="text-blue-600 underline">
+            Register
+          </Link>
+        </p>
+      </div>
+    </div>
+  )
+}import { useEffect, useState } from 'react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
+import { supabase } from '@/lib/supabase'
+
+type Question = {
+  id: string
+  question_text: string
+  explanation_text: string | null
+}
+
+type AnswerChoice = {
+  id: string
+  question_id: string
+  choice_letter: 'A' | 'B' | 'C' | 'D'
+  choice_text: string
+  is_correct: boolean
+}
+
+type QuestionWithChoices = {
+  question: Question
+  choices: AnswerChoice[]
+  displayOrder: string[] // Randomized order of choice letters
+}
+
+const DISPLAY_LABELS = ['A', 'B', 'C', 'D'] as const
+
+export default function PracticeShell() {
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+
+  const [questionPool, setQuestionPool] = useState<QuestionWithChoices[]>([]) // All available questions
+  const [currentQuestion, setCurrentQuestion] = useState<QuestionWithChoices | null>(null)
+  const [questionIndex, setQuestionIndex] = useState(0) // Track progress in infinite mode
+  const [selectedChoice, setSelectedChoice] = useState<string | null>(null)
+  const [isSubmitted, setIsSubmitted] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [topicName, setTopicName] = useState('')
+  const [topicId, setTopicId] = useState('')
+  const [isInfinite, setIsInfinite] = useState(false)
+
+  useEffect(() => {
+    const topic = searchParams.get('topic')
+    const count = searchParams.get('count')
+
+    if (!topic || !count) {
+      setError('Invalid practice configuration.')
+      setLoading(false)
+      return
+    }
+
+    const questionCount = parseInt(count, 10)
+    setIsInfinite(questionCount === 0)
+    setTopicId(topic)
+    loadPracticeQuestions(topic, questionCount)
+  }, [searchParams])
+
+  // Set current question when pool loads or index changes
+  useEffect(() => {
+    if (questionPool.length > 0) {
+      const poolIndex = questionIndex % questionPool.length
+      setCurrentQuestion(questionPool[poolIndex])
+    }
+  }, [questionPool, questionIndex])
+
+  async function loadPracticeQuestions(topicId: string, count: number) {
+    setLoading(true)
+    setError(null)
+
+    try {
+      // Get topic name
+      const { data: topic } = await supabase
+        .from('topics')
+        .select('name')
+        .eq('id', topicId)
+        .single()
+
+      if (topic) setTopicName(topic.name)
+
+      // Get all questions from this topic
+      const { data: questionsData, error: qError } = await supabase
+        .from('questions')
+        .select('id, question_text, explanation_text')
+        .eq('topic_id', topicId)
+
+      if (qError) throw qError
+      if (!questionsData || questionsData.length === 0) {
+        throw new Error('No questions available for this topic')
+      }
+
+      // Load choices for all questions
+      const questionIds = questionsData.map(q => q.id)
+      const { data: choicesData, error: cError } = await supabase
+        .from('answer_choices')
+        .select('id, question_id, choice_letter, choice_text, is_correct')
+        .in('question_id', questionIds)
+
+      if (cError) throw cError
+
+      // Combine and randomize choice order per question
+      const combined: QuestionWithChoices[] = questionsData.map(q => {
+        const qChoices = (choicesData || []).filter(c => c.question_id === q.id)
+        const displayOrder = [...qChoices]
+          .sort(() => Math.random() - 0.5)
+          .map(c => c.choice_letter)
+
+        return {
+          question: q as Question,
+          choices: qChoices as AnswerChoice[],
+          displayOrder,
+        }
+      })
+
+      // Shuffle the entire pool
+      const shuffled = [...combined].sort(() => Math.random() - 0.5)
+
+      setQuestionPool(shuffled)
+      
+      // Show warning if finite mode and fewer questions than requested
+      if (count > 0 && shuffled.length < count) {
+        setError(`Note: Only ${shuffled.length} questions available (you requested ${count})`)
+      }
+    } catch (err: any) {
+      console.error('Load practice questions error:', err)
+      setError(err.message || 'Failed to load practice questions')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function handleChoiceSelect(choiceId: string) {
+    if (isSubmitted) return // Already submitted
+    setSelectedChoice(choiceId)
+  }
+
+  function handleSubmit() {
+    if (!selectedChoice || isSubmitted) return
+    setIsSubmitted(true)
+  }
+
+  function handleNext() {
+    setQuestionIndex(questionIndex + 1)
+    setSelectedChoice(null)
+    setIsSubmitted(false)
+  }
+
+  function handleExit() {
+    navigate('/')
+  }
+
+  // Loading screen
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-lg text-gray-600">Loading practice questions...</p>
+      </div>
+    )
+  }
+
+  // Error screen
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="bg-white p-8 rounded-xl shadow max-w-md">
+          <h2 className="text-xl font-bold text-red-600 mb-4">Error</h2>
+          <p className="text-gray-700">{error}</p>
+          <button
+            type="button"
+            onClick={handleExit}
+            className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (questionPool.length === 0 || !currentQuestion) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-gray-600">No questions available</p>
+      </div>
+    )
+  }
+
+  const orderedChoices = currentQuestion.displayOrder
+    .map(letter => currentQuestion.choices.find(c => c.choice_letter === letter))
+    .filter((c): c is AnswerChoice => c !== undefined)
+
+  const selectedChoiceObj = currentQuestion.choices.find(c => c.id === selectedChoice)
+  const correctChoice = currentQuestion.choices.find(c => c.is_correct)
+
+  return (
+    <div className="min-h-screen bg-blue-600">
+      {/* Header */}
+      <div className="bg-white border-b shadow-sm">
+        <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+          <div>
+            <h1 className="text-lg font-bold text-gray-900">Practice Mode</h1>
+            <p className="text-sm text-gray-600">{topicName}</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleExit}
+            className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            Exit Practice
+          </button>
+        </div>
+      </div>
+
+      {/* Question Card */}
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="bg-white rounded-xl shadow-lg p-8 space-y-6">
+          {/* Progress */}
+          <div className="text-sm text-gray-600">
+            {isInfinite ? (
+              `Question ${questionIndex + 1} (Infinite mode)`
+            ) : (
+              `Question ${questionIndex + 1} of ${questionPool.length}`
+            )}
+          </div>
+
+          {/* Question Text */}
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">
+              {currentQuestion.question.question_text}
+            </h2>
+          </div>
+
+          {/* Answer Choices */}
+          <div className="space-y-3">
+            {orderedChoices.map((choice, idx) => {
+              const isSelected = choice.id === selectedChoice
+              const isCorrect = choice.is_correct
+              const showAsCorrect = isSubmitted && isCorrect
+              const showAsWrong = isSubmitted && isSelected && !isCorrect
+
+              let bgColor = 'bg-white'
+              let borderColor = 'border-gray-300'
+              let textColor = 'text-gray-900'
+              let cursor = 'cursor-pointer'
+
+              if (isSubmitted) {
+                cursor = 'cursor-default'
+              }
+
+              if (showAsCorrect) {
+                bgColor = 'bg-green-50'
+                borderColor = 'border-green-500'
+                textColor = 'text-green-900'
+              } else if (showAsWrong) {
+                bgColor = 'bg-red-50'
+                borderColor = 'border-red-500'
+                textColor = 'text-red-900'
+              } else if (isSelected) {
+                bgColor = 'bg-blue-50'
+                borderColor = 'border-blue-500'
+              }
+
+              return (
+                <button
+                  key={choice.id}
+                  type="button"
+                  onClick={() => handleChoiceSelect(choice.id)}
+                  disabled={isSubmitted}
+                  className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${bgColor} ${borderColor} ${cursor} hover:bg-blue-50 disabled:hover:${bgColor}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className={`font-bold ${textColor} min-w-[24px]`}>
+                      {DISPLAY_LABELS[idx]}.
+                    </span>
+                    <span className={`flex-1 ${textColor}`}>{choice.choice_text}</span>
+                    {showAsCorrect && (
+                      <span className="text-green-600 font-bold">✓ Correct</span>
+                    )}
+                    {showAsWrong && (
+                      <span className="text-red-600 font-bold">✗ Wrong</span>
+                    )}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Submit Button (before feedback) */}
+          {!isSubmitted && selectedChoice && (
+            <div className="pt-4 border-t">
+              <button
+                type="button"
+                onClick={handleSubmit}
+                className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                Submit Answer
+              </button>
+            </div>
+          )}
+
+          {/* Feedback (after submit) */}
+          {isSubmitted && (
+            <div className="space-y-4 pt-4 border-t">
+              {/* Result message */}
+              <div
+                className={`p-4 rounded-lg ${
+                  selectedChoiceObj?.is_correct
+                    ? 'bg-green-50 border border-green-200'
+                    : 'bg-red-50 border border-red-200'
+                }`}
+              >
+                <p
+                  className={`font-semibold ${
+                    selectedChoiceObj?.is_correct ? 'text-green-800' : 'text-red-800'
+                  }`}
+                >
+                  {selectedChoiceObj?.is_correct
+                    ? '✓ Correct!'
+                    : `✗ Incorrect. The correct answer is ${correctChoice?.choice_letter}.`}
+                </p>
+              </div>
+
+              {/* Explanation */}
+              {currentQuestion.question.explanation_text && (
+                <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                  <p className="text-sm font-semibold text-blue-900 mb-1">Explanation:</p>
+                  <p className="text-sm text-blue-800">{currentQuestion.question.explanation_text}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Navigation */}
+          <div className="flex justify-end items-center pt-4 border-t">
+            <button
+              type="button"
+              onClick={handleNext}
+              disabled={!isSubmitted}
+              className="bg-blue-600 text-white px-6 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors font-medium"
+            >
+              Next Question →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}import { Navigate } from 'react-router-dom'
+import { useAuth } from './useAuth'
+
+export function ProtectedRoute({
+  children,
+  requireAdmin = false
+}: {
+  children: JSX.Element
+  requireAdmin?: boolean
+}) {
+  const { user, role, loading } = useAuth()
+
+  if (loading || (requireAdmin && role === null)) {
+    return null // replace with spinner later
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+
+  if (requireAdmin && role !== 'admin') {
+    return <Navigate to="/" replace />
+  }
+
+  return children
+}
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { AuthProvider } from '@/auth/AuthProvider'
+
+const queryClient = new QueryClient()
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        {children}
+      </AuthProvider>
+    </QueryClientProvider>
+  )
+}
+import { z } from 'zod'
+
+const choiceSchema = z.object({
+  letter: z.enum(['A', 'B', 'C', 'D']),
+  text: z.string().trim().min(1, 'Choice text is required').max(500, 'Choice text too long'),
+  is_correct: z.boolean(),
+})
+
+export const questionSchema = z.object({
+  topic_id: z.string().uuid('Please select a valid topic'),
+  question_text: z
+    .string()
+    .trim()
+    .min(1, 'Question text is required')
+    .max(2000, 'Question text cannot exceed 2000 characters'),
+  explanation_text: z.string().trim().max(2000, 'Explanation too long').optional(),
+  difficulty_level: z
+    .number()
+    .int()
+    .min(1)
+    .max(5)
+    .nullable()
+    .optional(),
+  choices: z.array(choiceSchema).length(4, 'Must have exactly 4 choices'),
+}).refine(
+  (data) => {
+    // Exactly one choice must be correct
+    const correctCount = data.choices.filter(c => c.is_correct).length
+    return correctCount === 1
+  },
+  { message: 'Exactly one choice must be marked as correct', path: ['choices'] }
+).refine(
+  (data) => {
+    // All choices must have non-empty text after trim
+    return data.choices.every(c => c.text.trim().length > 0)
+  },
+  { message: 'All choices must have text', path: ['choices'] }
+)
+
+export type QuestionFormData = z.infer<typeof questionSchema>import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
+
+type QuestionStat = {
+  question_id: string
+  question_text: string
+  topic_name: string
+  times_attempted: number
+  times_correct: number
+  correctness_percentage: number
+  avg_time_spent: number
+  times_marked: number
+  avg_difficulty: number | null
+  avg_quality: number | null
+}
+
+type AnswerDistribution = {
+  choice_letter: string
+  choice_text: string
+  selection_count: number
+  is_correct: boolean
+}
+
+type Feedback = {
+  id: string
+  user_email: string
+  difficulty_rating: number | null
+  quality_rating: number | null
+  feedback_text: string | null
+  created_at: string
+}
+
+export default function QuestionAnalytics() {
+  const [stats, setStats] = useState<QuestionStat[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Detail modal state
+  const [selectedQuestion, setSelectedQuestion] = useState<QuestionStat | null>(null)
+  const [answerDist, setAnswerDist] = useState<AnswerDistribution[]>([])
+  const [feedback, setFeedback] = useState<Feedback[]>([])
+  const [loadingDetail, setLoadingDetail] = useState(false)
+
+  useEffect(() => {
+    loadQuestionStats()
+  }, [])
+
+  async function loadQuestionStats() {
+    setLoading(true)
+    setError(null)
+
+    try {
+      // Get all questions with their stats
+      const { data: questions, error: qError } = await supabase
+        .from('questions')
+        .select('id, question_text, topics(name)')
+        .order('created_at', { ascending: false })
+
+      if (qError) throw qError
+
+      // For each question, calculate stats from question_responses
+      const statsPromises = questions.map(async (q: any) => {
+        const { data: responses } = await supabase
+          .from('question_responses')
+          .select('is_correct, time_spent_seconds, marked_for_review')
+          .eq('question_id', q.id)
+
+        const { data: feedbackData } = await supabase
+          .from('question_feedback')
+          .select('difficulty_rating, quality_rating')
+          .eq('question_id', q.id)
+
+        const timesAttempted = responses?.length || 0
+        const timesCorrect = responses?.filter(r => r.is_correct === true).length || 0
+        const timesMarked = responses?.filter(r => r.marked_for_review).length || 0
+        const totalTime = responses?.reduce((sum, r) => sum + (r.time_spent_seconds || 0), 0) || 0
+
+        const avgDifficulty = feedbackData && feedbackData.length > 0
+          ? feedbackData.reduce((sum, f) => sum + (f.difficulty_rating || 0), 0) / feedbackData.filter(f => f.difficulty_rating).length
+          : null
+
+        const avgQuality = feedbackData && feedbackData.length > 0
+          ? feedbackData.reduce((sum, f) => sum + (f.quality_rating || 0), 0) / feedbackData.filter(f => f.quality_rating).length
+          : null
+
+        return {
+          question_id: q.id,
+          question_text: q.question_text,
+          topic_name: q.topics?.name || 'Unknown',
+          times_attempted: timesAttempted,
+          times_correct: timesCorrect,
+          correctness_percentage: timesAttempted > 0 ? Math.round((timesCorrect / timesAttempted) * 100) : 0,
+          avg_time_spent: timesAttempted > 0 ? Math.round(totalTime / timesAttempted) : 0,
+          times_marked: timesMarked,
+          avg_difficulty: avgDifficulty ? Math.round(avgDifficulty * 10) / 10 : null,
+          avg_quality: avgQuality ? Math.round(avgQuality * 10) / 10 : null,
+        }
+      })
+
+      const calculatedStats = await Promise.all(statsPromises)
+      setStats(calculatedStats)
+    } catch (err: any) {
+      console.error('Load question stats error:', err)
+      setError(err.message || 'Failed to load question analytics')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function loadQuestionDetail(questionId: string) {
+    setLoadingDetail(true)
+
+    try {
+      // Load answer distribution
+      const { data: choices } = await supabase
+        .from('answer_choices')
+        .select('id, choice_letter, choice_text, is_correct')
+        .eq('question_id', questionId)
+        .order('choice_letter')
+
+      const distPromises = (choices || []).map(async (choice: any) => {
+        const { count } = await supabase
+          .from('question_responses')
+          .select('*', { count: 'exact', head: true })
+          .eq('question_id', questionId)
+          .eq('selected_choice_id', choice.id)
+
+        return {
+          choice_letter: choice.choice_letter,
+          choice_text: choice.choice_text,
+          selection_count: count || 0,
+          is_correct: choice.is_correct,
+        }
+      })
+
+      const distribution = await Promise.all(distPromises)
+      setAnswerDist(distribution)
+
+      // Load feedback
+      const { data: feedbackData } = await supabase
+        .from('question_feedback')
+        .select('id, difficulty_rating, quality_rating, feedback_text, created_at, users!inner(email)')
+        .eq('question_id', questionId)
+        .order('created_at', { ascending: false })
+
+      setFeedback(
+        (feedbackData || []).map((f: any) => ({
+          id: f.id,
+          user_email: f.users?.email || 'Unknown',
+          difficulty_rating: f.difficulty_rating,
+          quality_rating: f.quality_rating,
+          feedback_text: f.feedback_text,
+          created_at: f.created_at,
+        }))
+      )
+    } catch (err: any) {
+      console.error('Load question detail error:', err)
+    } finally {
+      setLoadingDetail(false)
+    }
+  }
+
+  function openDetail(stat: QuestionStat) {
+    setSelectedQuestion(stat)
+    loadQuestionDetail(stat.question_id)
+  }
+
+  function closeDetail() {
+    setSelectedQuestion(null)
+    setAnswerDist([])
+    setFeedback([])
+  }
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <p className="text-gray-600">Loading question analytics...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          {error}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      <h2 className="text-2xl font-bold">Question Analytics</h2>
+
+      {stats.length === 0 ? (
+        <div className="bg-white rounded-lg shadow p-8 text-center">
+          <p className="text-gray-500">No question data available yet</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Question</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Topic</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Attempts</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Correct %</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Time</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Marked</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ratings</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {stats.map(stat => (
+                  <tr key={stat.question_id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 max-w-xs">
+                      <p className="text-sm text-gray-900 line-clamp-2">{stat.question_text}</p>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{stat.topic_name}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{stat.times_attempted}</td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                        stat.correctness_percentage >= 70
+                          ? 'bg-green-100 text-green-800'
+                          : stat.correctness_percentage >= 50
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {stat.correctness_percentage}%
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{stat.avg_time_spent}s</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{stat.times_marked}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {stat.avg_difficulty && stat.avg_quality
+                        ? `D:${stat.avg_difficulty} Q:${stat.avg_quality}`
+                        : '—'}
+                    </td>
+                    <td className="px-6 py-4 text-sm">
+                      <button
+                        type="button"
+                        onClick={() => openDetail(stat)}
+                        className="text-blue-600 hover:text-blue-800 font-medium"
+                      >
+                        Details
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Detail Modal */}
+      {selectedQuestion && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full my-8">
+            <div className="p-6 space-y-6">
+              {/* Header */}
+              <div className="flex justify-between items-start border-b pb-4">
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">Question Details</h3>
+                  <p className="text-gray-700">{selectedQuestion.question_text}</p>
+                  <p className="text-sm text-gray-500 mt-1">Topic: {selectedQuestion.topic_name}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeDetail}
+                  className="text-gray-400 hover:text-gray-600 text-2xl leading-none ml-4"
+                >
+                  ×
+                </button>
+              </div>
+
+              {loadingDetail ? (
+                <p className="text-gray-600">Loading details...</p>
+              ) : (
+                <>
+                  {/* Answer Distribution */}
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-3">Answer Distribution</h4>
+                    <div className="space-y-2">
+                      {answerDist.map(dist => (
+                        <div key={dist.choice_letter} className="flex items-center gap-3">
+                          <span className="font-bold text-gray-700 w-8">{dist.choice_letter}.</span>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm text-gray-900">{dist.choice_text}</span>
+                              <span className="text-sm font-medium text-gray-700">
+                                {dist.selection_count} {dist.selection_count === 1 ? 'selection' : 'selections'}
+                                {dist.is_correct && ' ✓'}
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div
+                                className={`h-2 rounded-full ${dist.is_correct ? 'bg-green-500' : 'bg-blue-500'}`}
+                                style={{
+                                  width: `${selectedQuestion.times_attempted > 0
+                                    ? (dist.selection_count / selectedQuestion.times_attempted) * 100
+                                    : 0}%`,
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Feedback */}
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-3">User Feedback ({feedback.length})</h4>
+                    {feedback.length === 0 ? (
+                      <p className="text-sm text-gray-500">No feedback yet</p>
+                    ) : (
+                      <div className="space-y-3 max-h-64 overflow-y-auto">
+                        {feedback.map(f => (
+                          <div key={f.id} className="border rounded-lg p-3 bg-gray-50">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium text-gray-700">{f.user_email}</span>
+                              <span className="text-xs text-gray-500">
+                                {new Date(f.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                            {(f.difficulty_rating || f.quality_rating) && (
+                              <div className="text-xs text-gray-600 mb-1">
+                                {f.difficulty_rating && `Difficulty: ${f.difficulty_rating}/5`}
+                                {f.difficulty_rating && f.quality_rating && ' • '}
+                                {f.quality_rating && `Quality: ${f.quality_rating}/5`}
+                              </div>
+                            )}
+                            {f.feedback_text && (
+                              <p className="text-sm text-gray-700">{f.feedback_text}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Close Button */}
+              <div className="flex justify-end border-t pt-4">
+                <button
+                  type="button"
+                  onClick={closeDetail}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
+import { questionSchema, type QuestionFormData } from './question.schema'
+import { useAuth } from '@/auth/useAuth'
+
+// Types matching database schema exactly
+type Topic = {
+  id: string
+  name: string
+}
+
+type Question = {
+  id: string
+  topic_id: string
+  question_text: string
+  explanation_text: string | null
+  difficulty_level: number | null
+  created_at: string
+  topics: { name: string }
+}
+
+type AnswerChoice = {
+  id: string
+  question_id: string
+  choice_letter: 'A' | 'B' | 'C' | 'D'
+  choice_text: string
+  is_correct: boolean
+}
+
+const LETTERS = ['A', 'B', 'C', 'D'] as const
+
+export default function QuestionsAdmin() {
+  const { user } = useAuth()
+  
+  // Data state
+  const [topics, setTopics] = useState<Topic[]>([])
+  const [questions, setQuestions] = useState<Question[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Form state
+  const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [formData, setFormData] = useState<QuestionFormData>({
+    topic_id: '',
+    question_text: '',
+    explanation_text: '',
+    difficulty_level: null,
+    choices: LETTERS.map(letter => ({ letter, text: '', is_correct: false })),
+  })
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [submitting, setSubmitting] = useState(false)
+
+  // Delete confirmation
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  // Load data on mount
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  async function loadData() {
+    setLoading(true)
+    setError(null)
+
+    try {
+      // Load topics and questions in parallel
+      const [topicsRes, questionsRes] = await Promise.all([
+        supabase.from('topics').select('id, name').order('name'),
+        supabase
+          .from('questions')
+          .select('id, topic_id, question_text, explanation_text, difficulty_level, created_at, topics!inner(name)')
+          .order('created_at', { ascending: false }),
+      ])
+
+      if (topicsRes.error) throw topicsRes.error
+      if (questionsRes.error) throw questionsRes.error
+
+      setTopics(topicsRes.data as Topic[])
+      setQuestions(questionsRes.data as Question[])
+    } catch (err: any) {
+      console.error('Load error:', err)
+      setError(err.message || 'Failed to load data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function resetForm() {
+    setFormData({
+      topic_id: topics[0]?.id || '',
+      question_text: '',
+      explanation_text: '',
+      difficulty_level: null,
+      choices: LETTERS.map(letter => ({ letter, text: '', is_correct: false })),
+    })
+    setFormErrors({})
+  }
+
+  function openCreateForm() {
+    setEditingId(null)
+    resetForm()
+    setShowForm(true)
+  }
+
+  async function openEditForm(questionId: string) {
+    setEditingId(questionId)
+    setFormErrors({})
+    setShowForm(true)
+
+    // Load question and choices
+    const [questionRes, choicesRes] = await Promise.all([
+      supabase.from('questions').select('*').eq('id', questionId).single(),
+      supabase
+        .from('answer_choices')
+        .select('*')
+        .eq('question_id', questionId)
+        .order('choice_letter'),
+    ])
+
+    if (questionRes.error || choicesRes.error) {
+      setError('Failed to load question for editing')
+      setShowForm(false)
+      return
+    }
+
+    const q = questionRes.data
+    const choices = choicesRes.data as AnswerChoice[]
+
+    // Map database choices back to form structure
+    setFormData({
+      topic_id: q.topic_id,
+      question_text: q.question_text,
+      explanation_text: q.explanation_text || '',
+      difficulty_level: q.difficulty_level,
+      choices: LETTERS.map(letter => {
+        const existing = choices.find(c => c.choice_letter === letter)
+        return {
+          letter,
+          text: existing?.choice_text || '',
+          is_correct: existing?.is_correct || false,
+        }
+      }),
+    })
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setFormErrors({})
+    setSubmitting(true)
+
+    // Client-side validation with Zod
+    const result = questionSchema.safeParse(formData)
+    if (!result.success) {
+      const errors: Record<string, string> = {}
+      result.error.errors.forEach(err => {
+        errors[err.path.join('.')] = err.message
+      })
+      setFormErrors(errors)
+      setSubmitting(false)
+      return
+    }
+
+    try {
+      if (editingId) {
+        await updateQuestion(editingId, result.data)
+      } else {
+        await createQuestion(result.data)
+      }
+      setShowForm(false)
+      await loadData()
+    } catch (err: any) {
+      console.error('Submit error:', err)
+      setFormErrors({ submit: err.message || 'Failed to save question' })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function createQuestion(data: QuestionFormData) {
+    if (!user) throw new Error('Not authenticated')
+
+    // Step 1: Insert question
+    const { data: question, error: qError } = await supabase
+      .from('questions')
+      .insert({
+        topic_id: data.topic_id,
+        question_text: data.question_text.trim(),
+        explanation_text: data.explanation_text?.trim() || null,
+        difficulty_level: data.difficulty_level,
+        created_by_admin_id: user.id,
+      })
+      .select()
+      .single()
+
+    if (qError) throw qError
+
+    // Step 2: Insert all 4 choices
+    const choicesData = data.choices.map(c => ({
+      question_id: question.id,
+      choice_letter: c.letter,
+      choice_text: c.text.trim(),
+      is_correct: c.is_correct,
+    }))
+
+    const { error: cError } = await supabase.from('answer_choices').insert(choicesData)
+    
+    if (cError) {
+      // Rollback: delete the question we just created
+      await supabase.from('questions').delete().eq('id', question.id)
+      throw new Error('Failed to create answer choices. Please try again.')
+    }
+  }
+
+  async function updateQuestion(questionId: string, data: QuestionFormData) {
+    // Step 1: Backup existing choices in case update fails
+    const { data: backupChoices, error: backupError } = await supabase
+      .from('answer_choices')
+      .select('*')
+      .eq('question_id', questionId)
+
+    if (backupError) throw new Error('Failed to load existing choices')
+
+    // Step 2: Update question metadata
+    const { error: qError } = await supabase
+      .from('questions')
+      .update({
+        topic_id: data.topic_id,
+        question_text: data.question_text.trim(),
+        explanation_text: data.explanation_text?.trim() || null,
+        difficulty_level: data.difficulty_level,
+      })
+      .eq('id', questionId)
+
+    if (qError) throw qError
+
+    // Step 3: Replace all choices (delete + insert)
+    const { error: deleteError } = await supabase
+      .from('answer_choices')
+      .delete()
+      .eq('question_id', questionId)
+
+    if (deleteError) throw deleteError
+
+    const choicesData = data.choices.map(c => ({
+      question_id: questionId,
+      choice_letter: c.letter,
+      choice_text: c.text.trim(),
+      is_correct: c.is_correct,
+    }))
+
+    const { error: cError } = await supabase.from('answer_choices').insert(choicesData)
+    
+    if (cError) {
+      // CRITICAL: Restore backup choices to prevent zero-choice state
+      if (backupChoices && backupChoices.length > 0) {
+        await supabase.from('answer_choices').insert(
+          backupChoices.map(({ id, ...rest }) => rest) // Remove id to allow re-insert
+        )
+      }
+      throw new Error('Failed to update choices. Original choices have been restored.')
+    }
+  }
+
+  async function handleDelete(questionId: string) {
+    setDeleting(true)
+    
+    try {
+      const { error } = await supabase.from('questions').delete().eq('id', questionId)
+      if (error) throw error
+      
+      setDeleteConfirm(null)
+      await loadData()
+    } catch (err: any) {
+      console.error('Delete error:', err)
+      setError(err.message || 'Failed to delete question')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  // Loading screen
+  if (loading) {
+    return (
+      <div className="p-6">
+        <p className="text-gray-600">Loading questions...</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-gray-900">Questions</h2>
+        <button
+          type="button"
+          onClick={openCreateForm}
+          disabled={topics.length === 0}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          Create Question
+        </button>
+      </div>
+
+      {/* Error banner */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          {error}
+        </div>
+      )}
+
+      {/* No topics warning */}
+      {topics.length === 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg">
+          No topics exist. Please create a topic first before adding questions.
+        </div>
+      )}
+
+      {/* Questions table */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Question
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Topic
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Difficulty
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {questions.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                  No questions yet. Create one to get started.
+                </td>
+              </tr>
+            ) : (
+              questions.map(q => (
+                <tr key={q.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4">
+                    <p className="text-sm text-gray-900 line-clamp-2">{q.question_text}</p>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{q.topics.name}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600 text-center">
+                    {q.difficulty_level ? (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100">
+                        {q.difficulty_level}/5
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-sm space-x-3">
+                    <button
+                      type="button"
+                      onClick={() => openEditForm(q.id)}
+                      className="text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteConfirm(q.id)}
+                      className="text-red-600 hover:text-red-800 font-medium"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Create/Edit Form Modal - Part 1 */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full my-8">
+            <form onSubmit={handleSubmit} className="p-6 space-y-6">
+              {/* Modal Header */}
+              <div className="flex justify-between items-center pb-4 border-b">
+                <h3 className="text-xl font-bold text-gray-900">
+                  {editingId ? 'Edit Question' : 'Create New Question'}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* Submit Error */}
+              {formErrors.submit && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                  {formErrors.submit}
+                </div>
+              )}
+
+              {/* Topic Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Topic <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.topic_id}
+                  onChange={e => setFormData({ ...formData, topic_id: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  <option value="">Select a topic</option>
+                  {topics.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+                {formErrors.topic_id && (
+                  <p className="text-red-600 text-sm mt-1">{formErrors.topic_id}</p>
+                )}
+              </div>
+
+              {/* Question Text */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Question Text <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={formData.question_text}
+                  onChange={e => setFormData({ ...formData, question_text: e.target.value })}
+                  rows={4}
+                  maxLength={2000}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  placeholder="Enter the question..."
+                  required
+                />
+                <div className="flex justify-between items-center mt-1">
+                  <p className="text-xs text-gray-500">
+                    {formData.question_text.length} / 2000 characters
+                  </p>
+                  {formErrors.question_text && (
+                    <p className="text-red-600 text-sm">{formErrors.question_text}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Answer Choices */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Answer Choices <span className="text-red-500">*</span>
+                </label>
+                <p className="text-xs text-gray-500 mb-3">
+                  Select the radio button next to the correct answer
+                </p>
+                <div className="space-y-3">
+                  {formData.choices.map((choice, idx) => (
+                    <div key={choice.letter} className="flex items-start gap-2">
+                      {/* Correct answer radio */}
+                      <div className="flex items-center h-10">
+                        <input
+                          type="radio"
+                          name="correct-choice"
+                          checked={choice.is_correct}
+                          onChange={() => {
+                            setFormData({
+                              ...formData,
+                              choices: formData.choices.map((c, i) => ({
+                                ...c,
+                                is_correct: i === idx,
+                              })),
+                            })
+                          }}
+                          className="w-4 h-4 text-blue-600"
+                          title="Mark as correct answer"
+                        />
+                      </div>
+                      
+                      {/* Choice input */}
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-gray-700 text-sm w-5">
+                            {choice.letter}.
+                          </span>
+                          <input
+                            type="text"
+                            value={choice.text}
+                            onChange={e => {
+                              const newChoices = [...formData.choices]
+                              newChoices[idx].text = e.target.value
+                              setFormData({ ...formData, choices: newChoices })
+                            }}
+                            maxLength={500}
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            placeholder={`Choice ${choice.letter}`}
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {formErrors.choices && (
+                  <p className="text-red-600 text-sm mt-2">{formErrors.choices}</p>
+                )}
+              </div>
+
+              {/* Explanation (Optional) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Explanation (optional)
+                </label>
+                <textarea
+                  value={formData.explanation_text}
+                  onChange={e => setFormData({ ...formData, explanation_text: e.target.value })}
+                  rows={3}
+                  maxLength={2000}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  placeholder="Explain why the correct answer is correct..."
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Shown to users after they submit the test
+                </p>
+              </div>
+
+              {/* Difficulty Level (Optional) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Difficulty Level (optional)
+                </label>
+                <select
+                  value={formData.difficulty_level ?? ''}
+                  onChange={e =>
+                    setFormData({
+                      ...formData,
+                      difficulty_level: e.target.value ? parseInt(e.target.value) : null,
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Not set</option>
+                  <option value="1">1 - Very Easy</option>
+                  <option value="2">2 - Easy</option>
+                  <option value="3">3 - Medium</option>
+                  <option value="4">4 - Hard</option>
+                  <option value="5">5 - Very Hard</option>
+                </select>
+              </div>
+
+              {/* Form Actions */}
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  disabled={submitting}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium"
+                >
+                  {submitting ? (editingId ? 'Updating...' : 'Creating...') : (editingId ? 'Update Question' : 'Create Question')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6 space-y-4">
+            <h3 className="text-lg font-bold text-gray-900">Delete Question?</h3>
+            <p className="text-gray-700 text-sm">
+              This question will be permanently removed. Past test results will be preserved,
+              but this question will not appear in future tests.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirm(null)}
+                disabled={deleting}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDelete(deleteConfirm)}
+                disabled={deleting}
+                className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors font-medium"
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { supabase } from '@/lib/supabase'
+
+export default function Register() {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState(false)
+
+  async function handleSubmit(e?: React.FormEvent) {
+    e?.preventDefault()
+    if (loading) return
+    setError(null)
+
+    const trimmedEmail = email.trim()
+    const trimmedPassword = password.trim()
+    const trimmedConfirm = confirm.trim()
+
+    if (!trimmedEmail || !trimmedPassword) {
+      setError('Email and password are required.')
+      return
+    }
+
+    if (trimmedPassword !== trimmedConfirm) {
+      setError('Passwords do not match.')
+      return
+    }
+
+    if (trimmedPassword.length < 6) {
+      setError('Password must be at least 6 characters.')
+      return
+    }
+
+    setLoading(true)
+
+    const { error } = await supabase.auth.signUp({
+      email: trimmedEmail,
+      password: trimmedPassword,
+      options: {
+        emailRedirectTo: window.location.origin,
+      },
+    })
+
+    if (error) {
+      setError(error.message)
+      setLoading(false)
+    } else {
+      setSuccess(true)
+      // Don't navigate. Email confirmation is required before login.
+      // The handle_new_user trigger creates the public.users row, but
+      // the session won't be active until the email link is clicked.
+    }
+  }
+
+  if (success) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-full max-w-sm bg-white p-8 rounded shadow text-center space-y-4">
+          <h1 className="text-2xl font-bold">Check Your Email</h1>
+          <p className="text-gray-600 text-sm">
+            A confirmation link has been sent to <strong>{email}</strong>.
+            Click it to activate your account, then log in.
+          </p>
+          <Link to="/login" className="text-blue-600 underline text-sm">
+            Back to Login
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="w-full max-w-sm bg-white p-8 rounded shadow space-y-4">
+        <h1 className="text-2xl font-bold text-center">Register</h1>
+
+        {error && <p className="text-red-600 text-sm">{error}</p>}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Email</label>
+            <input
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={e => { setEmail(e.target.value); setError(null) }}
+              className="border px-2 py-1 w-full rounded"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Password</label>
+            <input
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={e => { setPassword(e.target.value); setError(null) }}
+              className="border px-2 py-1 w-full rounded"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Confirm Password</label>
+            <input
+              type="password"
+              autoComplete="new-password"
+              value={confirm}
+              onChange={e => { setConfirm(e.target.value); setError(null) }}
+              className="border px-2 py-1 w-full rounded"
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="bg-blue-600 text-white px-4 py-2 w-full rounded disabled:opacity-50"
+          >
+            {loading ? 'Registering...' : 'Register'}
+          </button>
+        </form>
+
+        <p className="text-sm text-center text-gray-600">
+          Already have an account?{' '}
+          <Link to="/login" className="text-blue-600 underline">
+            Log In
+          </Link>
+        </p>
+      </div>
+    </div>
+  )
+}import { useEffect, useState } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/auth/useAuth'
+
+// Types matching database schema
+type TestAttempt = {
+  id: string
+  user_id: string
+  score: number
+  total_possible: number
+  total_time_seconds: number
+  completed_at: string
+  topics: { name: string }
+}
+
+type QuestionResponse = {
+  question_id: string
+  selected_choice_id: string | null
+  is_correct: boolean | null
+  displayed_choices_order: string[]
+}
+
+type Question = {
+  id: string
+  question_text: string
+  explanation_text: string | null
+}
+
+type AnswerChoice = {
+  id: string
+  question_id: string
+  choice_letter: 'A' | 'B' | 'C' | 'D'
+  choice_text: string
+  is_correct: boolean
+}
+
+type QuestionWithData = {
+  question: Question
+  response: QuestionResponse
+  choices: AnswerChoice[]
+}
+
+const DISPLAY_LABELS = ['A', 'B', 'C', 'D'] as const
+
+export default function Results() {
+  const { id: attemptId } = useParams<{ id: string }>()
+  const navigate = useNavigate()
+  const { user, loading: authLoading } = useAuth()
+
+  const [attempt, setAttempt] = useState<TestAttempt | null>(null)
+  const [questionsData, setQuestionsData] = useState<QuestionWithData[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Wait for auth to load before checking
+    if (authLoading) return
+
+    if (!attemptId || !user) {
+      setError('Invalid attempt or not authenticated')
+      setLoading(false)
+      return
+    }
+
+    loadResults()
+  }, [attemptId, user, authLoading])
+
+  async function loadResults() {
+    if (!attemptId || !user) return
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      // 1. Load attempt metadata with RLS check
+      const { data: attemptData, error: attemptError } = await supabase
+        .from('test_attempts')
+        .select('id, user_id, score, total_possible, total_time_seconds, completed_at, topics!inner(name)')
+        .eq('id', attemptId)
+        .single()
+
+      if (attemptError) throw new Error('Test attempt not found')
+      if (!attemptData) throw new Error('Test attempt not found')
+
+      // Security: Verify ownership (RLS should handle this but double-check)
+      if (attemptData.user_id !== user.id) {
+        throw new Error('Unauthorized: This is not your test')
+      }
+
+      // Verify test is completed
+      if (!attemptData.completed_at) {
+        navigate(`/test/${attemptId}`)
+        return
+      }
+
+      setAttempt(attemptData as TestAttempt)
+
+      // 2. Load attempt_questions to get position ordering
+      const { data: attemptQuestionsData, error: aqError } = await supabase
+        .from('attempt_questions')
+        .select('question_id, position')
+        .eq('attempt_id', attemptId)
+        .order('position')
+
+      if (aqError) throw aqError
+      if (!attemptQuestionsData || attemptQuestionsData.length === 0) {
+        throw new Error('No questions found for this test')
+      }
+
+      // 3. Load question responses
+      const { data: responsesData, error: responsesError } = await supabase
+        .from('question_responses')
+        .select('question_id, selected_choice_id, is_correct, displayed_choices_order')
+        .eq('attempt_id', attemptId)
+
+      if (responsesError) throw responsesError
+      if (!responsesData || responsesData.length === 0) {
+        throw new Error('No responses found for this test')
+      }
+
+      // 4. Merge position data with responses
+      const responsesWithPosition = attemptQuestionsData.map(aq => {
+        const response = responsesData.find(r => r.question_id === aq.question_id)
+        if (!response) {
+          throw new Error(`Response not found for question ${aq.question_id}`)
+        }
+        return {
+          ...response,
+          position: aq.position,
+        }
+      })
+
+      // Already sorted by position from the .order('position') above
+
+      // 5. Load questions
+      const questionIds = responsesWithPosition.map(r => r.question_id)
+      const { data: questionsData, error: questionsError } = await supabase
+        .from('questions')
+        .select('id, question_text, explanation_text')
+        .in('id', questionIds)
+
+      if (questionsError) throw questionsError
+
+      // 6. Load all answer choices for these questions
+      const { data: choicesData, error: choicesError } = await supabase
+        .from('answer_choices')
+        .select('id, question_id, choice_letter, choice_text, is_correct')
+        .in('question_id', questionIds)
+
+      if (choicesError) throw choicesError
+
+      // 7. Combine data into structured format (already in position order)
+      const combined: QuestionWithData[] = responsesWithPosition.map((response: any) => {
+        const question = questionsData?.find(q => q.id === response.question_id)
+        const choices = choicesData?.filter(c => c.question_id === response.question_id) || []
+
+        if (!question) {
+          throw new Error(`Question ${response.question_id} not found`)
+        }
+
+        return {
+          question: question as Question,
+          response: {
+            question_id: response.question_id,
+            selected_choice_id: response.selected_choice_id,
+            is_correct: response.is_correct,
+            displayed_choices_order: response.displayed_choices_order,
+          } as QuestionResponse,
+          choices: choices as AnswerChoice[],
+        }
+      })
+
+      setQuestionsData(combined)
+    } catch (err: any) {
+      console.error('Load results error:', err)
+      setError(err.message || 'Failed to load results')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Helper: Format time in MM:SS
+  function formatTime(seconds: number): string {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  // Helper: Order choices by displayed_choices_order
+  function orderChoices(response: QuestionResponse, choices: AnswerChoice[]): AnswerChoice[] {
+    if (!response.displayed_choices_order || response.displayed_choices_order.length === 0) {
+      // Fallback: sort by choice_letter A,B,C,D
+      return [...choices].sort((a, b) => a.choice_letter.localeCompare(b.choice_letter))
+    }
+
+    return response.displayed_choices_order
+      .map(letter => choices.find(c => c.choice_letter === letter))
+      .filter((c): c is AnswerChoice => c !== undefined)
+  }
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-lg text-gray-600">Loading results...</p>
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="bg-white p-8 rounded-xl shadow max-w-md">
+          <h2 className="text-xl font-bold text-red-600 mb-4">Error</h2>
+          <p className="text-gray-700">{error}</p>
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // No attempt loaded
+  if (!attempt) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-gray-600">No test results found.</p>
+      </div>
+    )
+  }
+
+  // Calculate percentage safely (avoid division by zero)
+  const percentage = attempt.total_possible > 0 
+    ? Math.round((attempt.score / attempt.total_possible) * 100) 
+    : 0
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold text-gray-900">Test Results</h1>
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+
+        {/* Summary Card */}
+        <div className="bg-white rounded-xl shadow-lg p-8">
+          <div className="text-center space-y-4">
+            <h2 className="text-2xl font-bold text-gray-900">{attempt.topics.name}</h2>
+            
+            {/* Score */}
+            <div className="space-y-2">
+              <p className="text-6xl font-bold text-blue-600">
+                {attempt.score} / {attempt.total_possible}
+              </p>
+              <p className="text-2xl text-gray-600">{percentage}%</p>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-2 gap-4 pt-4 max-w-md mx-auto">
+              <div className="text-center p-4 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-600">Time Taken</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  {formatTime(attempt.total_time_seconds)}
+                </p>
+              </div>
+              <div className="text-center p-4 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-600">Completed</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  {new Date(attempt.completed_at).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Questions Review */}
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold text-gray-900">Question Breakdown</h2>
+
+          {questionsData.map((item, index) => {
+            const orderedChoices = orderChoices(item.response, item.choices)
+            const userChoice = item.choices.find(c => c.id === item.response.selected_choice_id)
+            const correctChoice = item.choices.find(c => c.is_correct)
+
+            return (
+              <div key={item.question.id} className="bg-white rounded-xl shadow-lg p-6 space-y-4">
+                {/* Question Header */}
+                <div className="flex items-start justify-between border-b pb-4">
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-500 mb-2">Question {index + 1}</p>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {item.question.question_text}
+                    </h3>
+                  </div>
+                  {/* Result indicator */}
+                  <div className="ml-4">
+                    {item.response.is_correct === true && (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                        ✓ Correct
+                      </span>
+                    )}
+                    {item.response.is_correct === false && (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
+                        ✗ Incorrect
+                      </span>
+                    )}
+                    {item.response.is_correct === null && (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+                        — Unanswered
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Answer Choices */}
+                <div className="space-y-2">
+                  {orderedChoices.map((choice, idx) => {
+                    const isUserAnswer = choice.id === item.response.selected_choice_id
+                    const isCorrectAnswer = choice.is_correct
+
+                    // Determine styling
+                    let bgColor = 'bg-white'
+                    let borderColor = 'border-gray-300'
+                    let textColor = 'text-gray-900'
+
+                    if (isCorrectAnswer) {
+                      bgColor = 'bg-green-50'
+                      borderColor = 'border-green-500'
+                      textColor = 'text-green-900'
+                    } else if (isUserAnswer && !isCorrectAnswer) {
+                      bgColor = 'bg-red-50'
+                      borderColor = 'border-red-500'
+                      textColor = 'text-red-900'
+                    }
+
+                    return (
+                      <div
+                        key={choice.id}
+                        className={`flex items-start gap-2 p-3 rounded-lg border-2 ${bgColor} ${borderColor}`}
+                      >
+                        <span className={`font-bold text-sm ${textColor} w-6`}>
+                          {DISPLAY_LABELS[idx]}.
+                        </span>
+                        <span className={`flex-1 text-sm ${textColor}`}>
+                          {choice.choice_text}
+                        </span>
+                        {isUserAnswer && (
+                          <span className="text-xs font-medium text-gray-600">Your Answer</span>
+                        )}
+                        {isCorrectAnswer && (
+                          <span className="text-xs font-medium text-green-600">✓ Correct</span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Explanation */}
+                {item.question.explanation_text && (
+                  <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                    <p className="text-sm font-semibold text-blue-900 mb-1">Explanation:</p>
+                    <p className="text-sm text-blue-800">{item.question.explanation_text}</p>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Bottom Navigation */}
+        <div className="flex justify-center pb-8">
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}import { createBrowserRouter } from 'react-router-dom'
+import { ProtectedRoute } from '@/auth/ProtectedRoute'
+import Login from '@/pages/Login'
+import Register from '@/pages/Register'
+import Dashboard from '@/pages/Dashboard'
+import Admin from '@/pages/Admin'
+import TestShell from '@/tests/TestShell'
+import PracticeShell from '@/tests/PracticeShell'
+import Results from '@/pages/Results'
+
+export const router = createBrowserRouter([
+  { path: '/login', element: <Login /> },
+  { path: '/register', element: <Register /> },
+  {
+    path: '/',
+    element: (
+      <ProtectedRoute>
+        <Dashboard />
+      </ProtectedRoute>
+    )
+  },
+  {
+    path: '/test/:id',
+    element: (
+      <ProtectedRoute>
+        <TestShell />
+      </ProtectedRoute>
+    )
+  },
+  {
+    path: '/practice',
+    element: (
+      <ProtectedRoute>
+        <PracticeShell />
+      </ProtectedRoute>
+    )
+  },
+  {
+    path: '/results/:id',
+    element: (
+      <ProtectedRoute>
+        <Results />
+      </ProtectedRoute>
+    )
+  },
+  {
+    path: '/admin',
+    element: (
+      <ProtectedRoute requireAdmin>
+        <Admin />
+      </ProtectedRoute>
+    )
+  }
+])import { createClient } from '@supabase/supabase-js'
+import { env } from './env'
+
+export const supabase = createClient(
+  env.VITE_SUPABASE_URL,
+  env.VITE_SUPABASE_ANON_KEY,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  }
+)
+import { z } from 'zod'
+
+export const testConfigSchema = z.object({
+  topicId: z.string().uuid(),
+  questionCount: z.number().int().min(1).max(100),
+  useTimer: z.boolean(),
+  minutes: z.number().int().min(1).max(180).optional()
+})
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
+import { useNavigate } from 'react-router-dom'
+import { testConfigSchema } from './test.schema'
+
+type Topic = {
+  id: string
+  name: string
+}
+
+export function TestConfigForm() {
+  const [topics, setTopics] = useState<Topic[]>([])
+  const [topicId, setTopicId] = useState('')
+  const [questionCount, setQuestionCount] = useState('25')
+  const [useTimer, setUseTimer] = useState(false)
+  const [minutes, setMinutes] = useState('30')
+  const [practiceMode, setPracticeMode] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    loadTopics()
+  }, [])
+
+  async function loadTopics() {
+    const { data, error } = await supabase
+      .from('topics')
+      .select('id, name')
+      .order('name')
+
+    if (error) {
+      setError(error.message)
+    } else {
+      setTopics(data)
+    }
+    setLoading(false)
+  }
+
+  async function submit() {
+    if (submitting) return
+    setError(null)
+
+    const count = Number(questionCount)
+
+    // Validate infinite mode is only for practice
+    if (count === 0 && !practiceMode) {
+      setError('Infinite questions is only available in Practice Mode.')
+      return
+    }
+
+    const parsed = testConfigSchema.safeParse({
+      topicId,
+      questionCount: count === 0 ? 1 : count, // Use 1 for validation, actual infinite handled later
+      useTimer,
+      minutes: useTimer ? Number(minutes) : undefined,
+    })
+
+    if (!parsed.success) {
+      const first = parsed.error.issues[0]
+      setError(first?.message ?? 'Invalid test configuration.')
+      return
+    }
+
+    setSubmitting(true)
+
+    // Practice mode: navigate with query params (no test_attempts record)
+    if (practiceMode) {
+      const params = new URLSearchParams({
+        mode: 'practice',
+        topic: parsed.data.topicId,
+        count: String(count), // Pass 0 for infinite
+      })
+      navigate(`/practice?${params.toString()}`)
+      return
+    }
+
+    // Normal test mode: generate test and navigate with attemptId
+    const { data, error: rpcError } = await supabase.rpc('generate_test', {
+      p_topic_id: parsed.data.topicId,
+      p_question_count: parsed.data.questionCount,
+      p_use_timer: parsed.data.useTimer,
+      p_minutes: parsed.data.useTimer ? parsed.data.minutes : 0,
+    })
+
+    if (rpcError) {
+      setError(rpcError.message)
+      setSubmitting(false)
+      return
+    }
+
+    const attemptId = data as string
+    navigate(`/test/${attemptId}`)
+  }
+
+  if (loading) return <p>Loading topics...</p>
+
+  return (
+    <div className="space-y-4">
+      {error && <p className="text-red-600">{error}</p>}
+
+      <div>
+        <label className="block font-medium mb-1">Topic</label>
+        <select
+          className="border px-2 py-1 w-full"
+          value={topicId}
+          onChange={e => {
+            setTopicId(e.target.value)
+            setError(null)
+          }}
+        >
+          <option value="">Select a topic</option>
+          {topics.map(t => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="block font-medium mb-1">
+          Number of Questions
+        </label>
+        <select
+          value={questionCount}
+          onChange={e => {
+            setQuestionCount(e.target.value)
+            setError(null)
+          }}
+          className="border px-2 py-1 w-full"
+        >
+          <option value="10">10 questions</option>
+          <option value="25">25 questions</option>
+          <option value="50">50 questions</option>
+          <option value="100">100 questions</option>
+          <option value="0">Infinite (practice mode only)</option>
+        </select>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={useTimer}
+          onChange={e => {
+            setUseTimer(e.target.checked)
+            setError(null)
+          }}
+          disabled={practiceMode}
+        />
+        <label className={practiceMode ? 'text-gray-400' : ''}>
+          Enable countdown timer
+        </label>
+      </div>
+
+      <div>
+        <label className={`block font-medium mb-1 ${practiceMode ? 'text-gray-400' : ''}`}>
+          Time (minutes)
+        </label>
+        <input
+          type="number"
+          min={1}
+          max={180}
+          value={minutes}
+          onChange={e => setMinutes(e.target.value)}
+          disabled={!useTimer || practiceMode}
+          className="border px-2 py-1 w-full disabled:bg-gray-100"
+        />
+      </div>
+
+      <div className="border-t pt-4">
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={practiceMode}
+            onChange={e => {
+              setPracticeMode(e.target.checked)
+              if (e.target.checked) {
+                setUseTimer(false) // Disable timer in practice mode
+              }
+              setError(null)
+            }}
+          />
+          <label className="font-medium">Practice Mode</label>
+        </div>
+        <p className="text-xs text-gray-500 mt-1 ml-6">
+          See correct answers immediately after each question. No timer, no score tracking.
+        </p>
+      </div>
+
+      <button
+        onClick={submit}
+        disabled={submitting}
+        className="bg-blue-600 text-white px-4 py-2 w-full disabled:opacity-50"
+      >
+        {submitting ? 'Starting...' : practiceMode ? 'Start Practice' : 'Start Test'}
+      </button>
+    </div>
+  )
+}import { useEffect, useRef, useState } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { supabase } from '@/lib/supabase'
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+type Question = {
+  id: string
+  question_text: string
+  position: number
+}
+
+type AnswerChoice = {
+  id: string
+  question_id: string
+  choice_letter: string // original DB letter — used only for matching display order, never shown
+  choice_text: string
+}
+
+type ResponseRow = {
+  question_id: string
+  selected_choice_id: string | null
+  displayed_choices_order: string[]
+  eliminated_choices: string[]
+  marked_for_review: boolean
+  tab_switch_count: number
+}
+
+type ViewMode = 'one' | 'all' | 'review'
+
+// Positional labels rendered to the user. Always A B C D top-to-bottom
+// regardless of the DB's internal choice_letter values.
+const DISPLAY_LABELS = ['A', 'B', 'C', 'D']
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+// Given a question's responses row and the raw choices from the DB,
+// return choices sorted into the server-determined display order.
+function orderChoices(row: ResponseRow | undefined, raw: AnswerChoice[]): AnswerChoice[] {
+  if (!row?.displayed_choices_order?.length) return raw
+  return row.displayed_choices_order
+    .map(letter => raw.find(c => c.choice_letter === letter))
+    .filter((c): c is AnswerChoice => c !== undefined)
+}
+
+// ---------------------------------------------------------------------------
+// Sub-components (defined outside to prevent re-creation on every render)
+// ---------------------------------------------------------------------------
+
+type QuestionCardProps = {
+  question: Question
+  responses: ResponseRow[]
+  choices: AnswerChoice[]
+  questions: Question[]
+  viewMode: ViewMode
+  currentIndex: number
+  selectAnswer: (questionId: string, choiceId: string) => void
+  toggleElimination: (questionId: string, choiceId: string) => void
+  toggleMarked: (questionId: string) => void
+  openReport: (questionId: string) => void
+  goTo: (index: number) => void
+  prevIndex: () => number
+  nextIndex: () => number
+}
+
+function QuestionCard(props: QuestionCardProps) {
+  const {
+    question, responses, choices, questions, viewMode, currentIndex,
+    selectAnswer, toggleElimination, toggleMarked, openReport, goTo,
+    prevIndex, nextIndex
+  } = props
+
+  const row = responses.find(r => r.question_id === question.id)
+  const ordered = orderChoices(row, choices.filter(c => c.question_id === question.id))
+  const qIdx = questions.findIndex(q => q.id === question.id)
+
+  return (
+    <div id={`q-${question.id}`} className="bg-white rounded-xl shadow-lg p-8 space-y-6">
+      {/* progress + report trigger */}
+      <div className="flex justify-between items-center">
+        <span className="text-sm text-gray-500">
+          Question {qIdx + 1} of {questions.length}
+        </span>
+        <button
+          type="button"
+          onClick={() => openReport(question.id)}
+          className="text-xs text-gray-500 border border-gray-300 px-2 py-1 rounded hover:bg-gray-100 transition-colors"
+        >
+          Report Issue
+        </button>
+      </div>
+
+      {/* question text */}
+      <h2 className="text-xl font-bold text-gray-900">{question.question_text}</h2>
+
+      {/* answer choices */}
+      <div className="space-y-3">
+        {ordered.map((choice, i) => {
+          const isEliminated = row?.eliminated_choices?.includes(choice.id) ?? false
+          const isSelected   = row?.selected_choice_id === choice.id
+
+          return (
+            <div key={choice.id} className="flex items-center gap-2">
+              {/* choice button */}
+              <button
+                type="button"
+                onClick={() => selectAnswer(question.id, choice.id)}
+                disabled={isEliminated}
+                className={[
+                  'flex-1 text-left px-4 py-3 rounded-lg border-2 transition-colors',
+                  isEliminated
+                    ? 'bg-red-50 border-red-200 text-red-400 line-through cursor-not-allowed'
+                    : isSelected
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-gray-900 border-gray-300 hover:bg-blue-50 hover:border-blue-300',
+                ].join(' ')}
+              >
+                <span className="font-semibold">{DISPLAY_LABELS[i]}.</span>{' '}
+                {choice.choice_text}
+              </button>
+
+              {/* elimination toggle */}
+              <button
+                type="button"
+                onClick={() => toggleElimination(question.id, choice.id)}
+                className={[
+                  'w-8 h-8 flex items-center justify-center rounded border text-sm transition-colors',
+                  isEliminated
+                    ? 'bg-red-100 border-red-300 text-red-600 hover:bg-red-200'
+                    : 'bg-gray-100 border-gray-300 text-gray-500 hover:bg-gray-200',
+                ].join(' ')}
+                title={isEliminated ? 'Un-eliminate' : 'Eliminate'}
+              >
+                ✕
+              </button>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* mark for review */}
+      <label className="flex items-center gap-2 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={row?.marked_for_review ?? false}
+          onChange={() => toggleMarked(question.id)}
+          className="w-4 h-4 accent-blue-600"
+        />
+        <span className="text-sm text-gray-700">Mark for review</span>
+      </label>
+
+      {/* prev / next — only in one-at-a-time and review modes */}
+      {viewMode !== 'all' && (
+        <div className="flex justify-between pt-3 border-t border-gray-200">
+          <button
+            type="button"
+            onClick={() => goTo(prevIndex())}
+            disabled={prevIndex() === currentIndex}
+            className="px-4 py-2 border rounded-lg text-sm disabled:opacity-30 hover:bg-gray-50 transition-colors"
+          >
+            Previous
+          </button>
+          <button
+            type="button"
+            onClick={() => goTo(nextIndex())}
+            disabled={nextIndex() === currentIndex}
+            className="px-4 py-2 border rounded-lg text-sm disabled:opacity-30 hover:bg-gray-50 transition-colors"
+          >
+            Next
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+export default function TestShell() {
+  const { id: attemptIdParam } = useParams<{ id: string }>()
+  const navigate = useNavigate()
+
+  // ── core data ──────────────────────────────────────────────────────────
+  const [attemptId, setAttemptId] = useState<string | null>(null)
+  const [questions, setQuestions] = useState<Question[]>([])
+  const [choices, setChoices] = useState<AnswerChoice[]>([])
+  const [responses, setResponses] = useState<ResponseRow[]>([])
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // ── timer ──────────────────────────────────────────────────────────────
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null)
+  const [timerActive, setTimerActive] = useState(false)
+
+  // ── submit ─────────────────────────────────────────────────────────────
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const [score, setScore] = useState<{ score: number; total: number } | null>(null)
+
+  // ── phase 2 ────────────────────────────────────────────────────────────
+  const [viewMode, setViewMode] = useState<ViewMode>('one')
+
+  // ── report issue modal ─────────────────────────────────────────────────
+  const [reportState, setReportState] = useState<{
+    questionId: string | null
+    difficulty: number | null
+    quality: number | null
+    text: string
+    submitting: boolean
+    error: string | null
+  }>({ questionId: null, difficulty: null, quality: null, text: '', submitting: false, error: null })
+
+  // ── refs ───────────────────────────────────────────────────────────────
+  // currentIndex ref so the visibilitychange handler always reads the
+  // freshest index without needing to be torn down and re-added every render.
+  const currentIndexRef = useRef(0)
+  currentIndexRef.current = currentIndex
+
+  // autosave interval handle — stored in a ref so handleSubmit can clear it
+  // without depending on effect closure timing.
+  const autosaveRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // responses ref — mirrors state every render so that doSave() and the
+  // autosave interval always read the latest values without needing
+  // responses in any effect dep array (which would reset the interval).
+  const responsesRef = useRef<ResponseRow[]>([])
+  responsesRef.current = responses
+
+  // ---------------------------------------------------------------------------
+  // Read attemptId from URL on mount
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!attemptIdParam) {
+      setError('No test attempt ID provided.')
+      setLoading(false)
+      return
+    }
+
+    setAttemptId(attemptIdParam)
+  }, [attemptIdParam])
+
+  // ---------------------------------------------------------------------------
+  // Load test data after generation
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!attemptId) return
+
+    async function loadTest() {
+      setLoading(true)
+      setError(null)
+
+      // 1. Get attempt metadata (including timer settings)
+      const { data: attemptRow, error: attemptError } = await supabase
+        .from('test_attempts')
+        .select('started_at, use_timer, minutes')
+        .eq('id', attemptId)
+        .single()
+
+      if (attemptError) { setError('Failed to load test.'); setLoading(false); return }
+
+      // 2. Set started_at only if not already set (safe on refresh)
+      if (!attemptRow.started_at) {
+        await supabase
+          .from('test_attempts')
+          .update({ started_at: new Date().toISOString() })
+          .eq('id', attemptId)
+      }
+
+      // 3. Set up timer if enabled
+      if (attemptRow.use_timer && attemptRow.minutes) {
+        setTimeRemaining(attemptRow.minutes * 60)
+      }
+
+      // 4. Questions (ordered by position)
+      const { data: aqRows, error: aqErr } = await supabase
+        .from('attempt_questions')
+        .select('question_id, position, questions(id, question_text)')
+        .eq('attempt_id', attemptId)
+        .order('position')
+
+      if (aqErr) { setError('Failed to load questions.'); setLoading(false); return }
+
+      // 5. Answer choices (bulk fetch for all questions)
+      const qIds = aqRows.map((r: any) => r.question_id)
+      const { data: choiceRows, error: chErr } = await supabase
+        .from('answer_choices')
+        .select('id, question_id, choice_letter, choice_text')
+        .in('question_id', qIds)
+
+      if (chErr) { setError('Failed to load choices.'); setLoading(false); return }
+
+      // 6. Response rows — includes every field we need to hydrate
+      const { data: respRows, error: respErr } = await supabase
+        .from('question_responses')
+        .select(
+          'question_id, selected_choice_id, displayed_choices_order, ' +
+          'eliminated_choices, marked_for_review, tab_switch_count'
+        )
+        .eq('attempt_id', attemptId)
+
+      if (respErr) { setError('Failed to load responses.'); setLoading(false); return }
+
+      // 7. Commit state
+      setQuestions(aqRows.map((r: any) => ({
+        id: r.questions.id,
+        question_text: r.questions.question_text,
+        position: r.position,
+      })))
+      setChoices(choiceRows as AnswerChoice[])
+      setResponses(respRows as ResponseRow[])
+      setLoading(false)
+
+      // 8. Start timer after everything is visible
+      if (attemptRow.use_timer && attemptRow.minutes) {
+        setTimerActive(true)
+      }
+    }
+
+    loadTest()
+  }, [attemptId])
+
+  // ---------------------------------------------------------------------------
+  // Timer countdown
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!timerActive || timeRemaining === null || submitted) return
+    if (timeRemaining <= 0) { handleSubmit(); return }
+
+    const id = setInterval(() =>
+      setTimeRemaining(prev => (prev !== null && prev > 0 ? prev - 1 : 0)), 1000)
+    return () => clearInterval(id)
+  }, [timerActive, timeRemaining, submitted])
+
+  // ---------------------------------------------------------------------------
+  // Autosave — 30 s interval. Pushes selected_choice_id, eliminated_choices,
+  // marked_for_review, and tab_switch_count for every row. selected_choice_id
+  // is also saved per-click, but the periodic flush is the safety net that
+  // fixes dropped writes (the NULL issue).
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!attemptId || loading || submitted) return
+
+    autosaveRef.current = setInterval(() => doSave(), 30_000)
+    return () => { if (autosaveRef.current) clearInterval(autosaveRef.current) }
+  }, [attemptId, loading, submitted])
+
+  // ---------------------------------------------------------------------------
+  // Tab tracking — count tab-away events against whichever question is current
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!attemptId || loading || submitted) return
+
+    function onVisibilityChange() {
+      if (!document.hidden) return // only count when leaving
+      const qId = questions[currentIndexRef.current]?.id
+      if (!qId) return
+      setResponses(prev =>
+        prev.map(r =>
+          r.question_id === qId
+            ? { ...r, tab_switch_count: r.tab_switch_count + 1 }
+            : r
+        )
+      )
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [attemptId, loading, submitted, questions])
+
+  // ---------------------------------------------------------------------------
+  // Persistence helpers
+  // ---------------------------------------------------------------------------
+
+  // Push every response row to the DB in one sequential pass.
+  // Used by autosave interval and by the final flush before submit.
+  async function doSave() {
+    if (!attemptId) return
+    for (const r of responsesRef.current) {
+      await supabase
+        .from('question_responses')
+        .update({
+          selected_choice_id: r.selected_choice_id,
+          eliminated_choices: r.eliminated_choices,
+          marked_for_review: r.marked_for_review,
+          tab_switch_count: r.tab_switch_count,
+        })
+        .eq('attempt_id', attemptId)
+        .eq('question_id', r.question_id)
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Answer selection
+  // ---------------------------------------------------------------------------
+  async function selectAnswer(questionId: string, choiceId: string) {
+    if (!attemptId || submitting || submitted) return
+
+    // Cannot select an eliminated choice
+    const row = responses.find(r => r.question_id === questionId)
+    if (row?.eliminated_choices?.includes(choiceId)) return
+
+    const previousChoiceId = row?.selected_choice_id ?? null
+
+    // Optimistic
+    setResponses(prev =>
+      prev.map(r => r.question_id === questionId ? { ...r, selected_choice_id: choiceId } : r)
+    )
+
+    // Persist
+    const { error } = await supabase
+      .from('question_responses')
+      .update({ selected_choice_id: choiceId })
+      .eq('attempt_id', attemptId)
+      .eq('question_id', questionId)
+
+    if (error) {
+      // Revert and surface — fixes the silent-NULL bug
+      setResponses(prev =>
+        prev.map(r => r.question_id === questionId ? { ...r, selected_choice_id: previousChoiceId } : r)
+      )
+      setError('Failed to save answer. Please try again.')
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Elimination toggle
+  // ---------------------------------------------------------------------------
+  function toggleElimination(questionId: string, choiceId: string) {
+    if (submitting || submitted) return
+
+    setResponses(prev =>
+      prev.map(r => {
+        if (r.question_id !== questionId) return r
+
+        const wasEliminated = r.eliminated_choices.includes(choiceId)
+        const newEliminated = wasEliminated
+          ? r.eliminated_choices.filter(id => id !== choiceId)
+          : [...r.eliminated_choices, choiceId]
+
+        // If we're eliminating (not un-eliminating) a choice that is currently
+        // selected, deselect it first.
+        const newSelected =
+          !wasEliminated && r.selected_choice_id === choiceId
+            ? null
+            : r.selected_choice_id
+
+        return { ...r, eliminated_choices: newEliminated, selected_choice_id: newSelected }
+      })
+    )
+
+    // If we just deselected, persist that immediately so it doesn't rely
+    // solely on the next autosave tick.
+    const row = responses.find(r => r.question_id === questionId)
+    const wasEliminated = row?.eliminated_choices.includes(choiceId)
+    if (!wasEliminated && row?.selected_choice_id === choiceId) {
+      supabase
+        .from('question_responses')
+        .update({ selected_choice_id: null })
+        .eq('attempt_id', attemptId)
+        .eq('question_id', questionId)
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Mark for review toggle
+  // ---------------------------------------------------------------------------
+  function toggleMarked(questionId: string) {
+    if (submitting || submitted) return
+    setResponses(prev =>
+      prev.map(r => r.question_id === questionId ? { ...r, marked_for_review: !r.marked_for_review } : r)
+    )
+  }
+
+  // ---------------------------------------------------------------------------
+  // Navigation
+  // ---------------------------------------------------------------------------
+  function goTo(index: number) {
+    if (index >= 0 && index < questions.length) setCurrentIndex(index)
+  }
+
+  // In review mode prev/next skip to the nearest marked question.
+  function prevIndex(): number {
+    if (viewMode === 'review') {
+      for (let i = currentIndex - 1; i >= 0; i--) {
+        if (responses.find(r => r.question_id === questions[i].id)?.marked_for_review) return i
+      }
+      return currentIndex // no earlier marked question — stay put
+    }
+    return currentIndex - 1
+  }
+
+  function nextIndex(): number {
+    if (viewMode === 'review') {
+      for (let i = currentIndex + 1; i < questions.length; i++) {
+        if (responses.find(r => r.question_id === questions[i].id)?.marked_for_review) return i
+      }
+      return currentIndex
+    }
+    return currentIndex + 1
+  }
+
+  // When the user switches to review mode, snap currentIndex forward to the
+  // first marked question so prev/next don't start from an unmarked position.
+  function switchViewMode(mode: ViewMode) {
+    setViewMode(mode)
+    if (mode === 'review') {
+      for (let i = 0; i < questions.length; i++) {
+        if (responses.find(r => r.question_id === questions[i].id)?.marked_for_review) {
+          setCurrentIndex(i)
+          return
+        }
+      }
+      // Nothing marked — index stays; the render path shows a message.
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Submit
+  // ---------------------------------------------------------------------------
+  async function handleSubmit() {
+    if (!attemptId || submitting || submitted) return
+
+    const confirmed = window.confirm(
+      'Are you sure you want to submit? You cannot change your answers after submitting.'
+    )
+    if (!confirmed) return
+
+    setSubmitting(true)
+    setTimerActive(false)
+
+    // Stop the autosave interval
+    if (autosaveRef.current) { clearInterval(autosaveRef.current); autosaveRef.current = null }
+
+    // Final flush — every row, every field, right now. This is the safety net
+    // that guarantees nothing is NULL at score time even if earlier writes dropped.
+    await doSave()
+
+    // Also write the total tab-switch count onto the attempt row
+    const totalSwitches = responses.reduce((sum, r) => sum + r.tab_switch_count, 0)
+    await supabase
+      .from('test_attempts')
+      .update({ out_of_browser_seconds: totalSwitches })
+      .eq('id', attemptId)
+
+    // Score
+    const { data, error } = await supabase.rpc('submit_test', { p_attempt_id: attemptId })
+    if (error) {
+      setError(`Failed to submit: ${error.message}`)
+      setSubmitting(false)
+      return
+    }
+
+    setScore(data as { score: number; total: number })
+    setSubmitted(true)
+    setSubmitting(false)
+  }
+
+  // ---------------------------------------------------------------------------
+  // Report Issue
+  // ---------------------------------------------------------------------------
+  function openReport(questionId: string) {
+    setReportState({ questionId, difficulty: null, quality: null, text: '', submitting: false, error: null })
+  }
+
+  async function submitReport() {
+    if (!reportState.questionId || reportState.submitting) return
+    if (reportState.difficulty === null && reportState.quality === null && !reportState.text.trim()) {
+      setReportState(s => ({ ...s, error: 'Please fill in at least one field.' }))
+      return
+    }
+
+    setReportState(s => ({ ...s, submitting: true, error: null }))
+
+    const { data: userData } = await supabase.auth.getUser()
+    const { error } = await supabase.from('question_feedback').insert({
+      user_id: userData.user?.id,
+      question_id: reportState.questionId,
+      attempt_id: attemptId,
+      difficulty_rating: reportState.difficulty,
+      quality_rating: reportState.quality,
+      feedback_text: reportState.text.trim() || null,
+    })
+
+    if (error) {
+      setReportState(s => ({ ...s, submitting: false, error: 'Failed to submit. Try again.' }))
+      return
+    }
+
+    // Success — close modal
+    setReportState({ questionId: null, difficulty: null, quality: null, text: '', submitting: false, error: null })
+  }
+
+  // ---------------------------------------------------------------------------
+  // Formatting
+  // ---------------------------------------------------------------------------
+  function formatTime(secs: number) {
+    return `${Math.floor(secs / 60)}:${(secs % 60).toString().padStart(2, '0')}`
+  }
+
+  function timerClass() {
+    if (timeRemaining === null) return 'text-gray-700'
+    if (timeRemaining < 60)  return 'text-red-600 font-bold'
+    if (timeRemaining < 300) return 'text-yellow-600 font-semibold'
+    return 'text-gray-700'
+  }
+
+  // Palette button colour: yellow if marked, green if answered, else gray.
+  // Yellow takes priority over green so marked-and-answered reads as "needs review".
+  function paletteClass(questionId: string) {
+    const r = responses.find(row => row.question_id === questionId)
+    if (r?.marked_for_review)     return 'bg-yellow-400 text-black'
+    if (r?.selected_choice_id)    return 'bg-green-500 text-white'
+    return 'bg-gray-200 text-gray-700'
+  }
+
+  // Props to pass to QuestionCard
+  const cardProps = {
+    responses, choices, questions, viewMode, currentIndex,
+    selectAnswer, toggleElimination, toggleMarked, openReport,
+    goTo, prevIndex, nextIndex
+  }
+
+  // ---------------------------------------------------------------------------
+  // Early-return screens
+  // ---------------------------------------------------------------------------
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-lg text-gray-600">Loading questions…</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="bg-white p-8 rounded-xl shadow max-w-md">
+          <h2 className="text-xl font-bold text-red-600 mb-4">Error</h2>
+          <p className="text-gray-700">{error}</p>
+          <button type="button" onClick={() => navigate('/')} className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg">
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (submitted && score) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="bg-white p-8 rounded-xl shadow max-w-md w-full text-center space-y-4">
+          <h2 className="text-2xl font-bold">Test Complete!</h2>
+          <p className="text-5xl font-bold text-blue-600">{score.score} / {score.total}</p>
+          <p className="text-lg text-gray-600">
+            {score.total > 0 ? Math.round((score.score / score.total) * 100) : 0}%
+          </p>
+          <div className="flex flex-col gap-2 pt-4">
+            <button 
+              type="button" 
+              onClick={() => navigate(`/results/${attemptId}`)} 
+              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-medium"
+            >
+              View Detailed Results
+            </button>
+            <button 
+              type="button" 
+              onClick={() => navigate('/')} 
+              className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700"
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (questions.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-lg text-gray-600">No questions available.</p>
+      </div>
+    )
+  }
+
+  // ---------------------------------------------------------------------------
+  // Determine what the "review" body shows.
+  // If nothing is marked, show a message instead of crashing on an empty card.
+  // ---------------------------------------------------------------------------
+  const anyMarked = responses.some(r => r.marked_for_review)
+
+  // ---------------------------------------------------------------------------
+  // Main render
+  // ---------------------------------------------------------------------------
+  return (
+    <div className="min-h-screen bg-blue-600 flex flex-col">
+      {/* ── header ───────────────────────────────────────────────────────── */}
+      <header className="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
+        <h1 className="text-lg font-semibold text-gray-800">Practice Test</h1>
+        <div className="flex items-center gap-4">
+          {/* view-mode dropdown */}
+          <select
+            value={viewMode}
+            onChange={e => switchViewMode(e.target.value as ViewMode)}
+            className="border border-gray-300 px-2 py-1.5 rounded-lg text-sm bg-white"
+          >
+            <option value="one">One at a Time</option>
+            <option value="all">All Questions</option>
+            <option value="review">Review Only</option>
+          </select>
+
+          {/* timer */}
+          {timeRemaining !== null && (
+            <span className={`text-lg ${timerClass()}`}>{formatTime(timeRemaining)}</span>
+          )}
+
+          {/* submit */}
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+          >
+            {submitting ? 'Submitting…' : 'Submit Test'}
+          </button>
+        </div>
+      </header>
+
+      {/* ── question area ─────────────────────────────────────────────────── */}
+      <main className="flex-1 overflow-y-auto p-6">
+        <div className="max-w-2xl mx-auto space-y-6">
+          {viewMode === 'one' && questions[currentIndex] && (
+            <QuestionCard question={questions[currentIndex]} {...cardProps} />
+          )}
+
+          {viewMode === 'all' && questions.map(q => (
+            <QuestionCard key={q.id} question={q} {...cardProps} />
+          ))}
+
+          {viewMode === 'review' && (
+            anyMarked
+              ? <QuestionCard question={questions[currentIndex]} {...cardProps} />
+              : <div className="bg-white rounded-xl shadow-lg p-8 text-center space-y-2">
+                  <p className="text-gray-700 font-medium">No questions marked for review.</p>
+                  <p className="text-sm text-gray-400">
+                    Switch to another view and check "Mark for review" on questions you want to revisit.
+                  </p>
+                </div>
+          )}
+        </div>
+      </main>
+
+      {/* ── question palette (always visible) ────────────────────────────── */}
+      <footer className="bg-white border-t border-gray-200 px-6 py-3">
+        <div className="max-w-2xl mx-auto flex flex-wrap gap-2">
+          {questions.map((q, i) => {
+            const isCurrentInSingleView = i === currentIndex && viewMode !== 'all'
+            const isMarked = responses.find(r => r.question_id === q.id)?.marked_for_review
+            // In review mode, greyed-out buttons for unmarked questions are not clickable.
+            const blocked = viewMode === 'review' && !isMarked
+
+            return (
+              <button
+                key={q.id}
+                type="button"
+                onClick={() => {
+                  if (blocked) return
+                  setCurrentIndex(i)
+                  if (viewMode === 'all') {
+                    document.getElementById(`q-${q.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }
+                }}
+                className={[
+                  'w-9 h-9 rounded-lg text-sm font-semibold border-2 transition-colors',
+                  paletteClass(q.id),
+                  isCurrentInSingleView ? 'border-blue-600' : 'border-transparent',
+                  blocked ? 'opacity-35 cursor-not-allowed' : 'cursor-pointer hover:opacity-80',
+                ].join(' ')}
+                title={`Question ${i + 1}`}
+              >
+                {i + 1}
+              </button>
+            )
+          })}
+        </div>
+      </footer>
+
+      {/* ── report-issue modal ────────────────────────────────────────────── */}
+      {reportState.questionId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6 space-y-4">
+            {/* header */}
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-bold text-gray-900">Report an Issue</h3>
+              <button
+                type="button"
+                onClick={() => setReportState(s => ({ ...s, questionId: null }))}
+                className="text-gray-400 hover:text-gray-700 text-xl leading-none"
+              >✕</button>
+            </div>
+
+            {reportState.error && <p className="text-red-600 text-sm">{reportState.error}</p>}
+
+            {/* difficulty */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Difficulty (1–5)</label>
+              <div className="flex gap-2">
+                {[1,2,3,4,5].map(n => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setReportState(s => ({ ...s, difficulty: n }))}
+                    className={[
+                      'w-9 h-9 rounded-lg border text-sm font-semibold transition-colors',
+                      reportState.difficulty === n
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'border-gray-300 hover:bg-gray-100',
+                    ].join(' ')}
+                  >{n}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* quality */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Quality (1–5)</label>
+              <div className="flex gap-2">
+                {[1,2,3,4,5].map(n => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setReportState(s => ({ ...s, quality: n }))}
+                    className={[
+                      'w-9 h-9 rounded-lg border text-sm font-semibold transition-colors',
+                      reportState.quality === n
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'border-gray-300 hover:bg-gray-100',
+                    ].join(' ')}
+                  >{n}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* comments */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Comments (optional)</label>
+              <textarea
+                value={reportState.text}
+                onChange={e => setReportState(s => ({ ...s, text: e.target.value }))}
+                rows={3}
+                placeholder="Describe the issue…"
+                className="border border-gray-300 px-3 py-2 w-full rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* actions */}
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setReportState(s => ({ ...s, questionId: null }))}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+              >Cancel</button>
+              <button
+                type="button"
+                onClick={submitReport}
+                disabled={reportState.submitting}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50 transition-colors"
+              >{reportState.submitting ? 'Sending…' : 'Submit'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}import { useEffect, useRef, useState } from 'react'
+import { supabase } from '@/lib/supabase'
+
+type Topic = {
+  id: string
+  name: string
+}
+
+export function TopicsAdmin() {
+  const [topics, setTopics] = useState<Topic[]>([])
+  const [newTopic, setNewTopic] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [mutating, setMutating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  // Tracks the committed (server-confirmed) name for each topic so that
+  // onBlur can compare against it. If the value hasn't changed, no
+  // network request is sent.
+  const committedNames = useRef<Record<string, string>>({})
+
+  useEffect(() => {
+    loadTopics()
+  }, [])
+
+  async function loadTopics() {
+    setLoading(true)
+    setError(null)
+
+    const { data, error } = await supabase
+      .from('topics')
+      .select('id, name')
+      .order('name')
+
+    if (error) {
+      setError(
+        error.code === '42501'
+          ? 'You are not authorized to manage topics.'
+          : error.message
+      )
+    } else {
+      setTopics(data)
+      // Snapshot the names that came from the server.
+      const committed: Record<string, string> = {}
+      for (const t of data) {
+        committed[t.id] = t.name
+      }
+      committedNames.current = committed
+    }
+
+    setLoading(false)
+  }
+
+  async function createTopic() {
+    const name = newTopic.trim()
+    if (!name || mutating) return
+
+    setMutating(true)
+    setError(null)
+
+    const { data, error } = await supabase
+      .from('topics')
+      .insert({ name })
+      .select()
+      .single()
+
+    if (error) {
+      setError(error.message)
+    } else {
+      setTopics(prev => [...prev, data])
+      committedNames.current[data.id] = data.name
+      setNewTopic('')
+    }
+
+    setMutating(false)
+  }
+
+  async function renameTopic(id: string, name: string) {
+    const trimmed = name.trim()
+
+    // If the input is empty after trimming, revert to the last committed
+    // name rather than sending an empty string to the server.
+    if (!trimmed) {
+      setTopics(prev =>
+        prev.map(t => (t.id === id ? { ...t, name: committedNames.current[id] } : t))
+      )
+      return
+    }
+
+    // No change — skip the network request entirely.
+    if (trimmed === committedNames.current[id]) return
+    if (mutating) return
+
+    setMutating(true)
+    setError(null)
+
+    const { error } = await supabase
+      .from('topics')
+      .update({ name: trimmed })
+      .eq('id', id)
+
+    if (error) {
+      // Revert local state to the last known-good value on failure.
+      setTopics(prev =>
+        prev.map(t => (t.id === id ? { ...t, name: committedNames.current[id] } : t))
+      )
+      setError(error.message)
+    } else {
+      // Update committed snapshot to match what the server now has.
+      committedNames.current[id] = trimmed
+      setTopics(prev =>
+        prev.map(t => (t.id === id ? { ...t, name: trimmed } : t))
+      )
+    }
+
+    setMutating(false)
+  }
+
+  async function deleteTopic(id: string) {
+    if (!confirm('Delete this topic?') || mutating) return
+
+    setMutating(true)
+    setError(null)
+
+    const { error } = await supabase
+      .from('topics')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      setError(error.message)
+    } else {
+      setTopics(prev => prev.filter(t => t.id !== id))
+      delete committedNames.current[id]
+    }
+
+    setMutating(false)
+  }
+
+  if (loading) return <p>Loading topics...</p>
+
+  return (
+    <div>
+      {error && <p className="text-red-600 mb-4">{error}</p>}
+
+      <div className="flex gap-2 mb-4">
+        <input
+          className="border px-2 py-1 flex-1"
+          value={newTopic}
+          onChange={e => setNewTopic(e.target.value)}
+          placeholder="New topic name"
+          disabled={mutating}
+        />
+        <button
+          onClick={createTopic}
+          disabled={mutating}
+          className="bg-blue-600 text-white px-4 py-1 disabled:opacity-50"
+        >
+          Add
+        </button>
+      </div>
+
+      {topics.length === 0 ? (
+        <p className="text-gray-600">No topics created yet.</p>
+      ) : (
+        <ul className="space-y-2">
+          {topics.map(topic => (
+            <li
+              key={topic.id}
+              className="flex items-center justify-between border p-2"
+            >
+              <input
+                className="flex-1 mr-2 border px-2 py-1"
+                value={topic.name}
+                onChange={e =>
+                  setTopics(prev =>
+                    prev.map(t =>
+                      t.id === topic.id
+                        ? { ...t, name: e.target.value }
+                        : t
+                    )
+                  )
+                }
+                onBlur={e => renameTopic(topic.id, e.target.value)}
+                disabled={mutating}
+              />
+              <button
+                onClick={() => deleteTopic(topic.id)}
+                disabled={mutating}
+                className="text-red-600 disabled:opacity-50"
+              >
+                Delete
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+// Re-exports useAuth from AuthProvider so that consuming files
+// import from a stable path (this file) rather than reaching
+// into AuthProvider's internals. If the auth module is ever
+// restructured, only this file needs to change.
+export { useAuth } from './AuthProvider'
+import { useState } from 'react'
+import { supabase } from '@/lib/supabase'
+
+type GenerateTestParams = {
+  topicId: string
+  questionCount: number
+  useTimer: boolean
+  minutes: number
+}
+
+export function useGenerateTest() {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function generateTest(params: GenerateTestParams): Promise<string | null> {
+    setLoading(true)
+    setError(null)
+
+    const { data, error: rpcError } = await supabase.rpc('generate_test', {
+      p_topic_id: params.topicId,
+      p_question_count: params.questionCount,
+      p_use_timer: params.useTimer,
+      p_minutes: params.minutes,
+    })
+
+    if (rpcError) {
+      setError(rpcError.message)
+      setLoading(false)
+      return null
+    }
+
+    setLoading(false)
+    return data as string // The function returns uuid
+  }
+
+  return { generateTest, loading, error }
+}import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
+
+type UserStat = {
+  user_id: string
+  email: string
+  total_tests: number
+  avg_score_percentage: number
+  last_active: string
+}
+
+type UserDetail = {
+  test_history: Array<{
+    id: string
+    topic_name: string
+    score: number
+    total: number
+    completed_at: string
+  }>
+  performance_by_topic: Array<{
+    topic_name: string
+    tests_taken: number
+    avg_score_percentage: number
+  }>
+}
+
+export default function UserAnalytics() {
+  const [stats, setStats] = useState<UserStat[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Detail modal state
+  const [selectedUser, setSelectedUser] = useState<UserStat | null>(null)
+  const [userDetail, setUserDetail] = useState<UserDetail | null>(null)
+  const [loadingDetail, setLoadingDetail] = useState(false)
+
+  useEffect(() => {
+    loadUserStats()
+  }, [])
+
+  async function loadUserStats() {
+    setLoading(true)
+    setError(null)
+
+    try {
+      // Get all users with completed test attempts
+      const { data: users, error: uError } = await supabase
+        .from('users')
+        .select('id, email')
+        .order('email')
+
+      if (uError) throw uError
+
+      // For each user, calculate stats
+      const statsPromises = users.map(async (user: any) => {
+        const { data: attempts } = await supabase
+          .from('test_attempts')
+          .select('score, total_possible, completed_at')
+          .eq('user_id', user.id)
+          .not('completed_at', 'is', null)
+          .order('completed_at', { ascending: false })
+
+        if (!attempts || attempts.length === 0) {
+          return null // Skip users with no completed tests
+        }
+
+        const totalTests = attempts.length
+        const totalScore = attempts.reduce((sum, a) => sum + a.score, 0)
+        const totalPossible = attempts.reduce((sum, a) => sum + a.total_possible, 0)
+        const avgPercentage = totalPossible > 0 ? Math.round((totalScore / totalPossible) * 100) : 0
+        const lastActive = attempts[0].completed_at
+
+        return {
+          user_id: user.id,
+          email: user.email,
+          total_tests: totalTests,
+          avg_score_percentage: avgPercentage,
+          last_active: lastActive,
+        }
+      })
+
+      const calculatedStats = (await Promise.all(statsPromises)).filter(
+        (s): s is UserStat => s !== null
+      )
+      setStats(calculatedStats)
+    } catch (err: any) {
+      console.error('Load user stats error:', err)
+      setError(err.message || 'Failed to load user analytics')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function loadUserDetail(userId: string) {
+    setLoadingDetail(true)
+
+    try {
+      // Load test history
+      const { data: attempts } = await supabase
+        .from('test_attempts')
+        .select('id, score, total_possible, completed_at, topics(name)')
+        .eq('user_id', userId)
+        .not('completed_at', 'is', null)
+        .order('completed_at', { ascending: false })
+        .limit(20)
+
+      const testHistory = (attempts || []).map((a: any) => ({
+        id: a.id,
+        topic_name: a.topics?.name || 'Unknown',
+        score: a.score,
+        total: a.total_possible,
+        completed_at: a.completed_at,
+      }))
+
+      // Calculate performance by topic
+      const topicMap = new Map<string, { total: number; correct: number }>()
+
+      attempts?.forEach((a: any) => {
+        const topicName = a.topics?.name || 'Unknown'
+        const existing = topicMap.get(topicName) || { total: 0, correct: 0 }
+        topicMap.set(topicName, {
+          total: existing.total + a.total_possible,
+          correct: existing.correct + a.score,
+        })
+      })
+
+      const performanceByTopic = Array.from(topicMap.entries()).map(([topic, stats]) => ({
+        topic_name: topic,
+        tests_taken: attempts?.filter((a: any) => a.topics?.name === topic).length || 0,
+        avg_score_percentage: stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0,
+      }))
+
+      setUserDetail({ test_history: testHistory, performance_by_topic: performanceByTopic })
+    } catch (err: any) {
+      console.error('Load user detail error:', err)
+    } finally {
+      setLoadingDetail(false)
+    }
+  }
+
+  function openDetail(stat: UserStat) {
+    setSelectedUser(stat)
+    loadUserDetail(stat.user_id)
+  }
+
+  function closeDetail() {
+    setSelectedUser(null)
+    setUserDetail(null)
+  }
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <p className="text-gray-600">Loading user analytics...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          {error}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      <h2 className="text-2xl font-bold">User Analytics</h2>
+
+      {stats.length === 0 ? (
+        <div className="bg-white rounded-lg shadow p-8 text-center">
+          <p className="text-gray-500">No user data available yet</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Tests</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Score</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Active</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {stats.map(stat => (
+                <tr key={stat.user_id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 text-sm text-gray-900">{stat.email}</td>
+                  <td className="px-6 py-4 text-sm text-gray-900">{stat.total_tests}</td>
+                  <td className="px-6 py-4">
+                    <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                      stat.avg_score_percentage >= 70
+                        ? 'bg-green-100 text-green-800'
+                        : stat.avg_score_percentage >= 50
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {stat.avg_score_percentage}%
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-600">
+                    {new Date(stat.last_active).toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4 text-sm">
+                    <button
+                      type="button"
+                      onClick={() => openDetail(stat)}
+                      className="text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      Details
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Detail Modal */}
+      {selectedUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full my-8">
+            <div className="p-6 space-y-6">
+              {/* Header */}
+              <div className="flex justify-between items-center border-b pb-4">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">{selectedUser.email}</h3>
+                  <p className="text-sm text-gray-500">
+                    {selectedUser.total_tests} tests • {selectedUser.avg_score_percentage}% average
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeDetail}
+                  className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+                >
+                  ×
+                </button>
+              </div>
+
+              {loadingDetail ? (
+                <p className="text-gray-600">Loading details...</p>
+              ) : userDetail ? (
+                <>
+                  {/* Performance by Topic */}
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-3">Performance by Topic</h4>
+                    {userDetail.performance_by_topic.length === 0 ? (
+                      <p className="text-sm text-gray-500">No data available</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {userDetail.performance_by_topic.map(perf => (
+                          <div key={perf.topic_name} className="border rounded-lg p-4">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="font-medium text-gray-900">{perf.topic_name}</span>
+                              <span className="text-sm text-gray-600">{perf.tests_taken} tests</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 bg-gray-200 rounded-full h-2">
+                                <div
+                                  className={`h-2 rounded-full ${
+                                    perf.avg_score_percentage >= 70
+                                      ? 'bg-green-500'
+                                      : perf.avg_score_percentage >= 50
+                                      ? 'bg-yellow-500'
+                                      : 'bg-red-500'
+                                  }`}
+                                  style={{ width: `${perf.avg_score_percentage}%` }}
+                                />
+                              </div>
+                              <span className="text-sm font-medium text-gray-700">
+                                {perf.avg_score_percentage}%
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Test History */}
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-3">Recent Test History</h4>
+                    {userDetail.test_history.length === 0 ? (
+                      <p className="text-sm text-gray-500">No tests yet</p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                Date
+                              </th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                Topic
+                              </th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                Score
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {userDetail.test_history.map(test => (
+                              <tr key={test.id}>
+                                <td className="px-4 py-2 text-gray-900">
+                                  {new Date(test.completed_at).toLocaleDateString()}
+                                </td>
+                                <td className="px-4 py-2 text-gray-900">{test.topic_name}</td>
+                                <td className="px-4 py-2">
+                                  <span className="text-gray-900">
+                                    {test.score}/{test.total}
+                                  </span>
+                                  <span className="text-gray-500 ml-2">
+                                    ({test.total > 0 ? Math.round((test.score / test.total) * 100) : 0}%)
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : null}
+
+              {/* Close Button */}
+              <div className="flex justify-end border-t pt-4">
+                <button
+                  type="button"
+                  onClick={closeDetail}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

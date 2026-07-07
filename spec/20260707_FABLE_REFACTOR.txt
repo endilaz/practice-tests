@@ -1,0 +1,3077 @@
+╭─── Claude Code v2.1.202 ─────────────────────────────────────────────────────╮
+│                                                    │ Tips for getting        │
+│                Welcome back Daniel!                │ started                 │
+│                                                    │ Run /init to create a … │
+│                       ▐▛███▜▌                      │ ─────────────────────── │
+│                      ▝▜█████▛▘                     │ What's new              │
+│                        ▘▘ ▝▝                       │ Added a "Dynamic workf… │
+│   Fable 5 · Claude Team · Non-Trivial Fellowship   │ Added `workflow.run_id… │
+│   2026                                             │ Fixed a crash in the i… │
+│     ~\OneDrive\Documents\coding\practice_tests     │ /release-notes for more │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+ ▎ Fable 5 is back.
+ ▎ Until July 7, you can use up to 50% of your plan's weekly usage limit on Fable 5. If you hit your limit, you can continue on Fable 5 with usage credits. Fable 5 draws down usage faster than Opus 4.8. Learn more (https://support.claude.com/en/articles/15424964-claude-fable-5-promotional-access)
+
+❯ look over this current project and suggest some improvements for the future   
+
+● I'll take a look at the project structure and code to get a sense of what's
+  here, then give you suggestions.
+
+  Searched for 2 patterns, read 1 file, listed 1 directory (ctrl+o to expand)
+
+● The README gives a great picture. Now let me look at the actual code state —
+  file sizes, recent changes, and known pain points.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● A few quick follow-ups — the TODO, whether secrets are tracked, and dead-file
+  leftovers:
+
+  Read 1 file, ran 2 shell commands (ctrl+o to expand)
+
+● This is a solid project — the README is genuinely excellent, the security
+  model (RLS-authoritative, server-side scoring, answers never sent to the
+  client) is thought through, and the importer handles impressively gnarly
+  real-world input. The improvements I'd suggest are mostly about durability and
+  maintainability rather than features. Here's what I'd prioritize:
+
+  High value
+
+  1. Check your database schema into the repo. Right now generate_test(),
+  submit_test(), all RLS policies, triggers, and table definitions live only in
+  the Supabase dashboard. If the project is ever migrated, the dashboard state
+  gets fat-fingered, or you want a second environment, there's no source of
+  truth. The Supabase CLI (supabase db pull + a supabase/migrations/ folder)
+  fixes this in an afternoon and is the single biggest resilience win available.
+  It also unlocks running a local Supabase instance for development instead of
+  testing against production data.
+
+  2. Add tests for the study-guide parser. You have zero automated tests across
+  8,400 lines, and the manual checklist in the README is doing that job. You
+  don't need to test everything — but DocxImportStudyguides.tsx (1,732 lines) is
+  regex-heavy parsing logic that you've already broken and re-fixed several
+  times across commits ("relaxed regex so that 2017-2020 guide is imported
+  correctly"). Extract the pure parsing functions (answer-key matching,
+  orphaned-number recovery, packed-entry splitting) into a src/questions/parse/
+  module and pin them with Vitest cases built from the actual weird inputs
+  you've documented ("Intr oduction to Parliamentary Pr ocedure", 5) C15) A26) 
+  A, etc.). Vitest is a small add on top of Vite, and every future regex tweak
+  stops being a regression risk.
+
+  3. Fix the known bugs before adding features. Your last two commits mention
+  "feedback still not working" and the rosha practice-mode bug, and spec/TODO.md
+  is one truncated sentence ("fix practiceshell 318: letter is randomized
+  but…"). Looking at PracticeShell.tsx:318, the incorrect-answer message says
+  "The correct answer is highlighted" — if the letter/highlight mapping is off
+  against the randomized displayed_choices_order, that's likely the mismatch.
+  Worth pinning these down while the context is fresh; I'm happy to dig into
+  either one.
+
+  4. Add ESLint + a lint script. There's no linting at all. typescript-eslint
+  with eslint-plugin-react-hooks would catch the exact class of bug this
+  codebase is most exposed to — stale closures and missing hook dependencies.
+  You've already had to work around that with the responsesRef pattern in
+  TestShell; the hooks lint rule catches the cases you haven't noticed yet.
+
+  Worth doing
+
+  5. Split the three giant files. DocxImportStudyguides.tsx (1,732),
+  QuestionsAdmin.tsx (1,292), and TestShell.tsx (1,066) each mix data logic,
+  state, and UI. For TestShell specifically, extracting the persistence layer
+  (autosave, optimistic writes, refs) into a useTestAttempt hook would make the
+  component readable and let PracticeShell share it instead of diverging.
+
+  6. Clean up dead code. src/topics/useTopics.ts, src/topics/topic.schema.ts,
+  and src/questions/useQuestions.ts are empty files (the README documents them
+  as real, which will mislead future-you). src/questions/DocxImport.tsx (607
+  lines) looks superseded by DocxImportStudyguides.tsx — if so, move it to
+  deprecated/ or delete it. Also either adopt React Query or uninstall it; an
+  installed-but-banned dependency is the worst of both.
+
+  7. Tighten .gitignore. It contains *. (matches nothing useful — likely a typo)
+  and *.txt, which will silently ignore any text asset you ever want to commit.
+  token.* also matches more than intended.
+
+  8. Add a catch-all route and an error boundary. The router has no path: '*' —
+  unknown URLs render nothing. A small 404 route plus React Router's
+  errorElement on the root would also stop a render error in TestShell from
+  white-screening a student mid-test, which is your worst-case UX.
+
+  Operational / housekeeping
+
+  9. Move the repo out of OneDrive. node_modules and .git under OneDrive cause
+  sync churn, file-lock flakiness, and slow installs on Windows. Either move to
+  C:\dev\ or exclude the folder from sync.
+
+  10. Guest-account accumulation. Anonymous sign-ins (/guest) create a permanent
+  auth.users row per visit. Over time that's unbounded growth in users,
+  attempts, and responses. A scheduled cleanup (Supabase pg_cron deleting
+  anonymous users older than N days, cascading their attempts) is cheap
+  insurance.
+
+  11. Deployment + CI. There's no .github/workflows and no hosting config. Even
+  a minimal GitHub Action running npm run build (which already includes tsc 
+  --noEmit) on push would catch type errors before they land on main. When you
+  deploy, remember the SPA rewrite rule (/* → /index.html) since you're using
+  createBrowserRouter.
+
+  If I were sequencing this: migrations (#1) and the bug fixes (#3) first, then
+  Vitest + parser extraction (#2) since the importer is where you keep
+  iterating, then lint/cleanup as background work. Want me to start on any of
+  these?
+
+✻ Cooked for 1m 51s
+
+❯ yes, i agree with everything you mentioned. please proceed with implementing  
+  all of those changes. make sure to update relevant documentation/readme as    
+  you go along. make no mistakes.                                               
+
+● This is a big batch, so I'll work through it in phases: quick wins first
+  (gitignore, dead code, routing), then tooling (ESLint, Vitest, CI), then the
+  parser extraction with tests, then bug investigation, then the larger
+  refactors. Let me start by gathering the facts I need.
+
+  Searched for 3 patterns, read 8 files, ran 4 shell commands (ctrl+o to expand)
+
+● Now let me look at the remaining unused-variable sites before I start editing:
+
+  Searched for 1 pattern, read 3 files (ctrl+o to expand)
+● Update(tsconfig.app.json)
+  ⎿  File must be read first
+
+● Update(package.json)
+  ⎿  File must be read first
+
+● Update(src\auth\ProtectedRoute.tsx)
+  ⎿  Added 1 line
+      15   *   non-admin + requireAdmin → /
+      16   *   otherwise              → render children
+      17   */
+      18 +import type { ReactElement } from 'react'                      
+      19  import { Navigate } from 'react-router-dom'
+      20  import { useAuth } from './useAuth'
+      21  
+
+● Update(src\auth\ProtectedRoute.tsx)
+  ⎿  Added 1 line, removed 1 line
+      24    requireAdmin = false,
+      25    allowGuest = false,
+      26  }: {
+      27 -  children: JSX.Element                                        
+      27 +  children: ReactElement                                       
+      28    requireAdmin?: boolean
+      29    allowGuest?: boolean
+      30  }) {
+
+  Read 2 files (ctrl+o to expand)
+
+● Update(tsconfig.app.json)
+  ⎿  Added 1 line
+      3      "target": "ES2022",
+      4      "module": "ESNext",
+      5      "lib": ["ES2022", "DOM", "DOM.Iterable"],
+      6 +    "types": ["vite/client"],                                   
+      7      "skipLibCheck": true,
+      8  
+      9      /* Bundler mode */
+
+● Update(package.json)
+  ⎿  Added 2 lines, removed 1 line
+       5    "type": "module",
+       6    "scripts": {
+       7      "dev": "vite",
+       8 -    "build": "tsc --noEmit && vite build",                     
+       8 +    "build": "tsc -b && vite build",                           
+       9 +    "typecheck": "tsc -b",                                     
+      10      "preview": "vite preview"
+      11    },
+      12    "dependencies": {
+
+● Update(src\pages\Dashboard.tsx)
+  ⎿  Added 4 lines, removed 1 line
+      48  
+      49        if (fetchError) throw fetchError
+      50  
+      51 -      setAttempts(data as TestAttempt[])                       
+      51 +      // Cast via unknown: without generated DB types, supabase
+         +-js infers the                                                 
+      52 +      // to-one topics(name) embed as an array even though Post
+         +gREST returns                                                  
+      53 +      // an object for FK relations.                           
+      54 +      setAttempts(data as unknown as TestAttempt[])            
+      55      } catch (err: any) {
+      56        console.error('Load test history error:', err)
+      57        setError(err.message || 'Failed to load test history')
+
+● Update(src\pages\Results.tsx)
+  ⎿  Added 3 lines, removed 1 line
+       95          return
+       96        }
+       97  
+       98 -      setAttempt(attemptData as TestAttempt)                  
+       98 +      // Cast via unknown: supabase-js infers the to-one topic
+          +s embed as an                                                 
+       99 +      // array without generated DB types; PostgREST returns a
+          +n object.                                                     
+      100 +      setAttempt(attemptData as unknown as TestAttempt)       
+      101  
+      102        // 2. Load attempt_questions to get position ordering
+      103        const { data: attemptQuestionsData, error: aqError } = a
+           wait supabase
+
+● Update(src\pages\Results.tsx)
+  ⎿  Removed 2 lines
+      296  
+      297            {questionsData.map((item, index) => {
+      298              const orderedChoices = orderChoices(item.response,
+            item.choices)
+      299 -            const userChoice = item.choices.find(c => c.id ===
+          - item.response.selected_choice_id)                            
+      300 -            const correctChoice = item.choices.find(c => c.is_
+          -correct)                                                      
+      299  
+      300              return (
+      301                <div key={item.question.id} className="bg-white 
+           rounded-xl shadow-lg p-6 space-y-4">
+
+● Update(src\pages\GuestLanding.tsx)
+  ⎿  Added 1 line, removed 2 lines
+      13   * Dashboard does for logged-in users.
+      14   */
+      15  import { useEffect, useState } from 'react'
+      16 -import { Link, useNavigate } from 'react-router-dom'           
+      16 +import { Link } from 'react-router-dom'                        
+      17  import { supabase } from '@/lib/supabase'
+      18  import { TestConfigForm } from '@/tests/TestConfig'
+      19  
+      20  type PageState = 'signing-in' | 'ready' | 'error'
+      21  
+      22  export default function GuestLanding() {
+      23 -  const navigate = useNavigate()                               
+      23    const [pageState, setPageState] = useState<PageState>('signin
+          g-in')
+      24    const [errorMessage, setErrorMessage] = useState<string | nul
+          l>(null)
+      25  
+
+● Update(src\questions\DocxImport.tsx)
+  ⎿  Removed 2 lines
+      136        
+      137        // Check if this looks like an answer key entry
+      138        if (/^\d+\)$/.test(line)) {
+      139 -        const qNum = parseInt(line.replace(')', ''))          
+      140 -                                                              
+      139          // Check next line is a single letter A-D
+      140          if (i + 1 < lines.length && /^[A-D]$/.test(lines[i + 1
+           ].trim())) {
+      141            answerKeyStartIdx = i
+
+● Update(src\questions\DocxImportStudyguides.tsx)
+  ⎿  Removed 1 line
+      1136      let topicsImported = 0
+      1137  
+      1138      for (const normName of selectedTopics) {
+      1139 -      const topic = parseResult.topics.find(t => t.normalised
+           -Name === normName)!                                          
+      1139        const topicName = topicNames[normName].trim()
+      1140        const usePartial = overridePartial.has(normName)
+      1141  
+
+● Update(src\questions\DocxImportStudyguides.tsx)
+  ⎿  Removed 1 line
+      1349                ).length
+      1350                const validCount = live.filter(q => q.issues.le
+            ngth === 0).length
+      1351                const isOverridden = overridePartial.has(normNa
+            me)
+      1352 -              const isBlocked = isSelected && missingCount > 
+           -0 && !isOverridden                                           
+      1352                const isEditorOpen = expandedEditors.has(normNa
+            me)
+      1353  
+      1354                return (
+
+● Now the QuestionsAdmin feedback fix and related type errors:
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(src\questions\QuestionsAdmin.tsx)
+  ⎿  Added 1 line, removed 1 line
+      34  
+      35  type QuestionFeedback = {
+      36    id: string
+      37 -  user_id: string                                              
+      37 +  user_email: string                                           
+      38    difficulty_rating: number | null
+      39    quality_rating: number | null
+      40    feedback_text: string | null
+
+● Update(src\questions\QuestionsAdmin.tsx)
+  ⎿  Added 7 lines, removed 3 lines
+      371      setLoadingFeedback(true)
+      372  
+      373      try {
+      374 +      // users(email) is a LEFT join on purpose. With users!in
+          +ner(email), RLS                                               
+      375 +      // on the users table silently filters out feedback rows
+          + whose author row                                             
+      376 +      // the admin cannot read — the whole list comes back emp
+          +ty. With a left                                               
+      377 +      // join the feedback row survives and the email just com
+          +es back null.                                                 
+      378        const { data, error: fbErr } = await supabase
+      379          .from('question_feedback')
+      376 -        .select('id, question_id, user_id, difficulty_rating, 
+          -quality_rating, feedback_text, created_at')                   
+      380 +        .select('id, difficulty_rating, quality_rating, feedba
+          +ck_text, created_at, users(email)')                           
+      381 +        .eq('question_id', question.id)                       
+      382          .order('created_at', { ascending: false })
+      383  
+      384        if (fbErr) throw fbErr
+     ...
+      386        setFeedbackItems(
+      387          (data || []).map((f: any) => ({
+      388            id: f.id,
+      384 -          user_id: f.user_id ?? 'Unknown',                    
+      389 +          user_email: f.users?.email || 'Unknown',            
+      390            difficulty_rating: f.difficulty_rating,
+      391            quality_rating: f.quality_rating,
+      392            feedback_text: f.feedback_text,
+      393            created_at: f.created_at,
+      394          }))
+      395        )
+      391 -      console.log('feedback data:', data, 'error:', fbErr)    
+      396      } catch (err: any) {
+      397        console.error('Load feedback error:', err)
+      398      } finally {
+
+● Update(src\questions\QuestionsAdmin.tsx)
+  ⎿  Added 3 lines, removed 1 line
+      180  
+      181        if (qErr) throw qErr
+      182  
+      183 -      setQuestions(data as Question[])                        
+      183 +      // Cast via unknown: the template-literal select string 
+          +defeats                                                       
+      184 +      // supabase-js's compile-time column parser.            
+      185 +      setQuestions(data as unknown as Question[])             
+      186        setTotalCount(count ?? 0)
+      187      } catch (err: any) {
+      188        console.error('Load questions error:', err)
+● Update(src\questions\QuestionsAdmin.tsx)
+  ⎿  Added 1 line, removed 1 line
+      260      const result = questionSchema.safeParse(formData)
+      261      if (!result.success) {
+      262        const errors: Record<string, string> = {}
+      263 -      result.error.errors.forEach(err => {                    
+      263 +      result.error.issues.forEach(err => {                    
+      264          errors[err.path.join('.')] = err.message
+      265        })
+      266        setFormErrors(errors)
+
+● Update(src\questions\QuestionsAdmin.tsx)
+  ⎿  Added 1 line, removed 1 line
+      452        const json = JSON.parse(text)
+      453        const result = bulkImportSchema.safeParse(json)
+      454        if (!result.success) {
+      455 -        setImportErrors(result.error.errors.map(err =>        
+      455 +        setImportErrors(result.error.issues.map(err =>        
+      456            `${err.path.join('.') || 'Root'}: ${err.message}`
+      457          ))
+      458          return
+
+● Update(src\questions\QuestionsAdmin.tsx)
+  ⎿  Removed 1 line
+       95  
+       96    // --- Bulk import state ---
+       97    const [showImportModal, setShowImportModal]   = useState(fal
+           se)
+       98 -  const [importFile, setImportFile]             = useState<Fil
+          -e | null>(null)                                               
+       98    const [importData, setImportData]             = useState<Bul
+           kImportData | null>(null)
+       99    const [importErrors, setImportErrors]         = useState<str
+           ing[]>([])
+      100    const [importing, setImporting]               = useState(fal
+           se)
+
+● Update(src\questions\QuestionsAdmin.tsx)
+  ⎿  Removed 1 line
+      412  
+      413    function openImportModal() {
+      414      setShowImportModal(true)
+      415 -    setImportFile(null)                                       
+      415      setImportData(null)
+      416      setImportErrors([])
+      417      setImportSuccess(null)
+
+● Update(src\questions\QuestionsAdmin.tsx)
+  ⎿  Removed 1 line
+      420  
+      421    function closeImportModal() {
+      422      setShowImportModal(false)
+      423 -    setImportFile(null)                                       
+      423      setImportData(null)
+      424      setImportErrors([])
+      425      setImportSuccess(null)
+
+● Update(src\questions\QuestionsAdmin.tsx)
+  ⎿  Removed 1 line
+      430      const file = e.target.files?.[0]
+      431      if (!file) return
+      432  
+      433 -    setImportFile(file)                                       
+      433      setImportData(null)
+      434      setImportErrors([])
+      435      setImportSuccess(null)
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(src\tests\TestShell.tsx)
+  ⎿  Added 3 lines, removed 1 line
+      392          position: r.position,
+      393        })))
+      394        setChoices(choiceRows as AnswerChoice[])
+      395 -      setResponses(respRows as ResponseRow[])                 
+      395 +      // Cast via unknown: supabase-js cannot statically parse
+          + this select                                                  
+      396 +      // string, so it falls back to an error type.           
+      397 +      setResponses(respRows as unknown as ResponseRow[])      
+      398        setLoading(false)
+      399  
+      400        // 8. Start timer after data is visible
+
+● Update(src\tests\PracticeShell.tsx)
+  ⎿  Added 11 lines
+      24  
+      25  const DISPLAY_LABELS = ['A', 'B', 'C', 'D'] as const
+      26  
+      27 +// Fisher-Yates — sort(() => Math.random() - 0.5) is biased and
+         + can leave                                                     
+      28 +// items near their original positions far more often than chan
+         +ce.                                                            
+      29 +function shuffle<T>(arr: T[]): T[] {                           
+      30 +  const a = [...arr]                                           
+      31 +  for (let i = a.length - 1; i > 0; i--) {                     
+      32 +    const j = Math.floor(Math.random() * (i + 1))              
+      33 +    ;[a[i], a[j]] = [a[j], a[i]]                               
+      34 +  }                                                            
+      35 +  return a                                                     
+      36 +}                                                              
+      37 +                                                               
+      38  export default function PracticeShell() {
+      39    const [searchParams] = useSearchParams()
+      40    const navigate = useNavigate()
+
+● Update(src\tests\PracticeShell.tsx)
+  ⎿  Added 1 line, removed 1 line
+      44    const [questionIndex, setQuestionIndex] = useState(0) // Trac
+          k progress in infinite mode
+      45    const [selectedChoice, setSelectedChoice] = useState<string |
+           null>(null)
+      46    const [isSubmitted, setIsSubmitted] = useState(false)
+      47 +  const [correctCount, setCorrectCount] = useState(0)          
+      48    const [loading, setLoading] = useState(true)
+      49    const [error, setError] = useState<string | null>(null)
+      50    const [topicName, setTopicName] = useState('')
+      50 -  const [topicId, setTopicId] = useState('')                   
+      51    const [isInfinite, setIsInfinite] = useState(false)
+      52  
+      53    useEffect(() => {
+
+● Update(src\tests\PracticeShell.tsx)
+  ⎿  Removed 1 line
+      62  
+      63      const questionCount = parseInt(count, 10)
+      64      setIsInfinite(questionCount === 0)
+      65 -    setTopicId(topic)                                          
+      65      loadPracticeQuestions(topic, questionCount)
+      66    }, [searchParams])
+      67  
+
+● Update(src\tests\PracticeShell.tsx)
+  ⎿  Added 5 lines, removed 7 lines
+      110        // Combine and randomize choice order per question
+      111        const combined: QuestionWithChoices[] = questionsData.ma
+           p(q => {
+      112          const qChoices = (choicesData || []).filter(c => c.que
+           stion_id === q.id)
+      113 -        const displayOrder = [...qChoices]                    
+      114 -          .sort(() => Math.random() - 0.5)                    
+      115 -          .map(c => c.choice_letter)                          
+      113 +        const displayOrder = shuffle(qChoices).map(c => c.choi
+          +ce_letter)                                                    
+      114  
+      115          return {
+      116            question: q as Question,
+     ...
+      119          }
+      120        })
+      121  
+      124 -      // Shuffle the entire pool                              
+      125 -      const shuffled = [...combined].sort(() => Math.random() 
+          -- 0.5)                                                        
+      122 +      // Shuffle the pool, then cap it at the requested count 
+          +in finite mode                                                
+      123 +      // (count = 0 means infinite: cycle through the whole to
+          +pic).                                                         
+      124 +      const shuffled = shuffle(combined)                      
+      125 +      setQuestionPool(count > 0 ? shuffled.slice(0, count) : s
+          +huffled)                                                      
+      126  
+      127 -      setQuestionPool(shuffled)                               
+      128 -                                                              
+      127        // Show warning if finite mode and fewer questions than 
+           requested
+      128        if (count > 0 && shuffled.length < count) {
+      129          setError(`Note: Only ${shuffled.length} questions avai
+           lable (you requested ${count})`)
+
+● Update(src\tests\PracticeShell.tsx)
+  ⎿  Added 10 lines
+      143  
+      144    function handleSubmit() {
+      145      if (!selectedChoice || isSubmitted) return
+      146 +    const choice = currentQuestion?.choices.find(c => c.id ===
+          + selectedChoice)                                              
+      147 +    if (choice?.is_correct) setCorrectCount(n => n + 1)       
+      148      setIsSubmitted(true)
+      149    }
+      150  
+     ...
+      154      setIsSubmitted(false)
+      155    }
+      156  
+      157 +  function handleRestart() {                                  
+      158 +    setQuestionPool(prev => shuffle(prev))                    
+      159 +    setQuestionIndex(0)                                       
+      160 +    setCorrectCount(0)                                        
+      161 +    setSelectedChoice(null)                                   
+      162 +    setIsSubmitted(false)                                     
+      163 +  }                                                           
+      164 +                                                              
+      165    function handleExit() {
+      166      navigate('/')
+      167    }
+
+● Update(src\tests\PracticeShell.tsx)
+  ⎿  Added 35 lines, removed 1 line
+      202      )
+      203    }
+      204  
+      205 +  // Finite mode: past the last question — show the summary sc
+          +reen                                                          
+      206 +  if (!isInfinite && questionIndex >= questionPool.length) {  
+      207 +    const pct = Math.round((correctCount / questionPool.length
+          +) * 100)                                                      
+      208 +    return (                                                  
+      209 +      <div className="min-h-screen bg-blue-600 flex items-cent
+          +er justify-center px-4">                                      
+      210 +        <div className="bg-white rounded-xl shadow-lg p-8 max-
+          +w-md w-full text-center space-y-6">                           
+      211 +          <h2 className="text-2xl font-bold text-gray-900">Pra
+          +ctice Complete!</h2>                                          
+      212 +          <p className="text-gray-600">{topicName}</p>        
+      213 +          <div className="py-4">                              
+      214 +            <p className="text-5xl font-bold text-blue-600">{p
+          +ct}%</p>                                                      
+      215 +            <p className="text-gray-600 mt-2">                
+      216 +              {correctCount} of {questionPool.length} correct 
+      217 +            </p>                                              
+      218 +          </div>                                              
+      219 +          <div className="flex gap-3 justify-center">         
+      220 +            <button                                           
+      221 +              type="button"                                   
+      222 +              onClick={handleRestart}                         
+      223 +              className="bg-blue-600 text-white px-6 py-3 roun
+          +ded-lg hover:bg-blue-700 transition-colors font-medium"       
+      224 +            >                                                 
+      225 +              Practice Again                                  
+      226 +            </button>                                         
+      227 +            <button                                           
+      228 +              type="button"                                   
+      229 +              onClick={handleExit}                            
+      230 +              className="bg-gray-600 text-white px-6 py-3 roun
+          +ded-lg hover:bg-gray-700 transition-colors font-medium"       
+      231 +            >                                                 
+      232 +              Back to Dashboard                               
+      233 +            </button>                                         
+      234 +          </div>                                              
+      235 +        </div>                                                
+      236 +      </div>                                                  
+      237 +    )                                                         
+      238 +  }                                                           
+      239 +                                                              
+      240    const orderedChoices = currentQuestion.displayOrder
+      241      .map(letter => currentQuestion.choices.find(c => c.choice_
+           letter === letter))
+      242      .filter((c): c is AnswerChoice => c !== undefined)
+      243  
+      244    const selectedChoiceObj = currentQuestion.choices.find(c => 
+           c.id === selectedChoice)
+      210 -  const correctChoice = currentQuestion.choices.find(c => c.is
+          -_correct)                                                     
+      245  
+      246    return (
+      247      <div className="min-h-screen bg-blue-600">
+
+● Update(src\tests\PracticeShell.tsx)
+  ⎿  Added 1 line, removed 1 line
+      317                    type="button"
+      318                    onClick={() => handleChoiceSelect(choice.id)
+           }
+      319                    disabled={isSubmitted}
+      320 -                  className={`w-full text-left p-4 rounded-lg 
+          -border-2 transition-colors ${bgColor} ${borderColor} ${cursor}
+          - hover:bg-blue-50 disabled:hover:${bgColor}`}                 
+      320 +                  className={`w-full text-left p-4 rounded-lg 
+          +border-2 transition-colors ${bgColor} ${borderColor} ${cursor}
+          + ${!isSubmitted ? 'hover:bg-blue-50' : ''}`}                  
+      321                  >
+      322                    <div className="flex items-start gap-3">
+      323                      <span className={`font-bold ${textColor} m
+           in-w-[24px]`}>
+
+● Update(src\tests\PracticeShell.tsx)
+  ⎿  Added 3 lines, removed 1 line
+      389                disabled={!isSubmitted}
+      390                className="bg-blue-600 text-white px-6 py-3 roun
+           ded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:b
+           g-blue-700 transition-colors font-medium"
+      391              >
+      392 -              Next Question →                                 
+      392 +              {!isInfinite && questionIndex === questionPool.l
+          +ength - 1                                                     
+      393 +                ? 'Finish →'                                  
+      394 +                : 'Next Question →'}                          
+      395              </button>
+      396            </div>
+      397          </div>
+
+● Update(src\tests\PracticeShell.tsx)
+  ⎿  Added 1 line
+      47    const [correctCount, setCorrectCount] = useState(0)
+      48    const [loading, setLoading] = useState(true)
+      49    const [error, setError] = useState<string | null>(null)
+      50 +  const [notice, setNotice] = useState<string | null>(null)    
+      51    const [topicName, setTopicName] = useState('')
+      52    const [isInfinite, setIsInfinite] = useState(false)
+      53  
+
+● Update(src\tests\PracticeShell.tsx)
+  ⎿  Added 4 lines, removed 2 lines
+      125        const shuffled = shuffle(combined)
+      126        setQuestionPool(count > 0 ? shuffled.slice(0, count) : s
+           huffled)
+      127  
+      128 -      // Show warning if finite mode and fewer questions than 
+          -requested                                                     
+      128 +      // Non-blocking notice if finite mode and fewer question
+          +s than requested.                                             
+      129 +      // Must NOT go through setError — that renders the full 
+          +error screen and                                              
+      130 +      // would lock the student out of practicing with the sma
+          +ller pool.                                                    
+      131        if (count > 0 && shuffled.length < count) {
+      130 -        setError(`Note: Only ${shuffled.length} questions avai
+          -lable (you requested ${count})`)                              
+      132 +        setNotice(`Only ${shuffled.length} questions available
+          + (you requested ${count}).`)                                  
+      133        }
+      134      } catch (err: any) {
+      135        console.error('Load practice questions error:', err)
+● Update(src\tests\PracticeShell.tsx)
+  ⎿  Added 5 lines
+      267  
+      268        {/* Question Card */}
+      269        <div className="max-w-4xl mx-auto px-4 py-8">
+      270 +        {notice && (                                          
+      271 +          <div className="mb-4 bg-amber-50 border border-amber
+          +-200 rounded-lg px-4 py-3 text-sm text-amber-800">            
+      272 +            {notice}                                          
+      273 +          </div>                                              
+      274 +        )}                                                    
+      275          <div className="bg-white rounded-xl shadow-lg p-8 spac
+           e-y-6">
+      276            {/* Progress */}
+      277            <div className="text-sm text-gray-600">
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Typecheck is green — the build gate is now real. Phase 2: routing hardening,
+  dead code, gitignore.
+
+  Read 1 file (ctrl+o to expand)
+
+● Write(src\pages\NotFound.tsx)
+  ⎿  Wrote 22 lines to src\pages\NotFound.tsx
+       1 /*
+       2  * NotFound.tsx
+       3  * Catch-all page for unknown URLs (router path: '*').
+       5 import { Link } from 'react-router-dom'
+       6 
+       7 export default function NotFound() {
+       8   return (
+       9     <div className="min-h-screen flex items-center justify-cente
+      10       <div className="bg-white p-8 rounded-xl shadow max-w-md te
+         xt-center space-y-4">
+     … +15 lines (ctrl+o to expand)
+
+● Write(src\pages\RouteError.tsx)
+  ⎿  Wrote 42 lines to src\pages\RouteError.tsx
+       1 /*
+       2  * RouteError.tsx
+       3  * Router-level error boundary (errorElement). Catches render er
+       4  * in the route tree so a crash shows a recoverable screen inste
+         ad of a blank
+       5  * page — which matters most if something throws mid-test.
+       6  */
+       7 import { Link, useRouteError } from 'react-router-dom'
+       9 export default function RouteError() {
+      10   const error = useRouteError()
+     … +43 lines (ctrl+o to expand)
+
+● Write(src\app\providers.tsx)
+  ⎿  Added 1 line, removed 10 lines
+       1 -import { QueryClient, QueryClientProvider } from '@tanstack/rea
+         -ct-query'                                                      
+       1  import { AuthProvider } from '@/auth/AuthProvider'
+       2  
+       4 -const queryClient = new QueryClient()                          
+       5 -                                                               
+       3  export function Providers({ children }: { children: React.React
+          Node }) {
+       7 -  return (                                                     
+       8 -    <QueryClientProvider client={queryClient}>                 
+       9 -      <AuthProvider>                                           
+      10 -        {children}                                             
+      11 -      </AuthProvider>                                          
+      12 -    </QueryClientProvider>                                     
+      13 -  )                                                            
+       4 +  return <AuthProvider>{children}</AuthProvider>               
+       5  }
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(src\app\router.tsx)
+  ⎿  Added 3 lines
+       7   * Guest routes   – anonymous session allowed: /test/:id, /resu
+          lts/:id
+       8   * Auth routes    – full (non-anonymous) session required: /, /
+          change-password
+       9   * Admin routes   – admin role required: /admin
+      10 + * Fallbacks      – '*' renders NotFound; a pathless parent rou
+         +te carries                                                     
+      11 + *                  errorElement so render errors show RouteErr
+         +or instead of                                                  
+      12 + *                  a blank page.                              
+      13   */
+      14  import { createBrowserRouter } from 'react-router-dom'
+      15  import { ProtectedRoute } from '@/auth/ProtectedRoute'
+
+● Update(src\app\router.tsx)
+  ⎿  Added 5 lines
+      24  import ResetPassword from '@/pages/ResetPassword'
+      25  import ChangePassword from '@/pages/ChangePassword'
+      26  import GuestLanding from '@/pages/GuestLanding'
+      27 +import NotFound from '@/pages/NotFound'                        
+      28 +import RouteError from '@/pages/RouteError'                    
+      29  
+      30  export const router = createBrowserRouter([
+      31 +  {                                                            
+      32 +  errorElement: <RouteError />,                                
+      33 +  children: [                                                  
+      34    // ── public ────────────────────────────────────────────────
+          ──────────────
+      35    { path: '/login',           element: <Login /> },
+      36    { path: '/register',        element: <Register /> },
+
+● Update(src\app\router.tsx)
+  ⎿  Added 5 lines
+       95        </ProtectedRoute>
+       96      ),
+       97    },
+       98 +                                                              
+       99 +  // ── catch-all 404 ────────────────────────────────────────
+          +────────────────                                              
+      100 +  { path: '*', element: <NotFound /> },                       
+      101 +  ],                                                          
+      102 +  },                                                          
+      103  ])
+      104   No newline at end of file
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+● Update(.gitignore)
+  ⎿  Added 2 lines, removed 2 lines
+      1 +# Secrets                                                       
+      2  credentials.*
+      2 -token.json                                                      
+      3 -*.txt                                                           
+      3  token.*
+      4  .env.local
+      5 +.env*.local                                                     
+      6  
+      7  # Logs
+      8  logs
+
+● Update(.gitignore)
+  ⎿  Removed 1 line
+      16  node_modules
+      17  dist
+      18  dist-ssr
+      19 -*.                                                             
+      19  .vite
+      20  
+      21  # Editor directories and files
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Typecheck stays green. Now Phase 3 — ESLint, Vitest, CI:
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+● Write(eslint.config.js)
+  ⎿  Wrote 36 lines to eslint.config.js
+       1 import js from '@eslint/js'
+       2 import globals from 'globals'
+       3 import reactHooks from 'eslint-plugin-react-hooks'
+       4 import reactRefresh from 'eslint-plugin-react-refresh'
+       5 import tseslint from 'typescript-eslint'
+       7 export default tseslint.config(
+       8   { ignores: ['dist', 'node_modules', 'deprecated', '.vite'] },
+       9   {
+      10     extends: [js.configs.recommended, ...tseslint.configs.recomm
+         ended],
+     … +30 lines (ctrl+o to expand)
+
+● Write(vite.config.ts)
+  ⎿  Added 5 lines
+      1 +/// <reference types="vitest/config" />                         
+      2  import path from 'path'
+      3  import { defineConfig } from 'vite'
+      4  import react from '@vitejs/plugin-react'
+     ...
+      14        '@': path.resolve(__dirname, './src'),
+      15      },
+      16    },
+      17 +  test: {                                                      
+      18 +    environment: 'node',                                       
+      19 +    include: ['src/**/*.test.{ts,tsx}'],                       
+      20 +  },                                                           
+      21  })
+
+● Update(package.json)
+  ⎿  Error editing file
+
+● Update(.gitignore)
+  ⎿  Added 1 line
+      17  dist
+      18  dist-ssr
+      19  .vite
+      20 +*.tsbuildinfo                                                  
+      21  
+      22  # Editor directories and files
+      23  .vscode/*
+
+  Read 1 file (ctrl+o to expand)
+● Update(package.json)
+  ⎿  Added 3 lines
+       7      "dev": "vite",
+       8      "build": "tsc -b && vite build",
+       9      "typecheck": "tsc -b",
+      10 +    "lint": "eslint .",                                        
+      11 +    "test": "vitest run",                                      
+      12 +    "test:watch": "vitest",                                    
+      13      "preview": "vite preview"
+      14    },
+      15    "dependencies": {
+
+● Write(.github\workflows\ci.yml)
+  ⎿  Wrote 33 lines to .github\workflows\ci.yml
+       1 name: CI
+       2 
+       3 on:
+       4   push:
+       5     branches: [main, vibes]
+       6   pull_request:
+       7     branches: [main]
+       8 
+       9 jobs:
+      10   checks:
+     … +23 lines (ctrl+o to expand)
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+● Update(eslint.config.js)
+  ⎿  Added 6 lines
+      19      },
+      20      rules: {
+      21        ...reactHooks.configs.recommended.rules,
+      22 +      // The React-Compiler-era rules flag long-standing patter
+         +ns in this                                                     
+      23 +      // codebase (setState during data loads in effects, mutat
+         +ing local                                                      
+      24 +      // accumulators). Keep them visible as warnings; fix oppo
+         +rtunistically                                                  
+      25 +      // when touching those files rather than churning working
+         + code.                                                         
+      26 +      'react-hooks/set-state-in-effect': 'warn',               
+      27 +      'react-hooks/immutability': 'warn',                      
+      28        'react-refresh/only-export-components': [
+      29          'warn',
+      30          { allowConstantExport: true },
+
+  Read 1 file, ran 4 shell commands (ctrl+o to expand)
+
+● Now the parser module edits — remove the UI-specific Step type, add a header,
+  and export the public + test surface:
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(src\questions\parse\studyguideParser.ts)
+  ⎿  Added 11 lines, removed 3 lines
+       1 +/*                                                             
+       2 + * studyguideParser.ts                                         
+       3 + * Pure parsing logic for FBLA study guide imports (DOCX + PDF)
+         +, extracted                                                    
+       4 + * from DocxImportStudyguides.tsx so it can be unit-tested. Eve
+         +rything here                                                   
+       5 + * except extractPdfText/extractDocxText/parseDocument is plain
+       6 + * string-in/data-out and runs under Node — see studyguideParse
+         +r.test.ts.                                                     
+       7 + */                                                            
+       8 +                                                               
+       9  // ------------------------------------------------------------
+          ---------------
+      10  // Types
+      11  // ------------------------------------------------------------
+          ---------------
+      12  
+       5 -type ChoiceLetter = 'A' | 'B' | 'C' | 'D'                      
+      13 +export type ChoiceLetter = 'A' | 'B' | 'C' | 'D'               
+      14  
+       7 -type ParsedChoice = {                                          
+      15 +export type ParsedChoice = {                                   
+      16    letter: ChoiceLetter
+      17    text: string
+      18  }
+      19  
+      12 -type ParsedQuestion = {                                        
+      20 +export type ParsedQuestion = {                                 
+      21    questionNumber: number
+      22    questionText: string
+      23    choices: ParsedChoice[]
+
+● Update(src\questions\parse\studyguideParser.ts)
+  ⎿  Added 1 line, removed 1 line
+      25    issues: string[]
+      26  }
+      27  
+      28 -type TopicBlock = {                                            
+      28 +export type TopicBlock = {                                     
+      29    /** Normalised key used for answer key matching, e.g. "accoun
+          ting i" */
+      30    normalisedName: string
+      31    /** Display name as it appeared in the document, e.g. "Accoun
+          ting I" */
+
+● Update(src\questions\parse\studyguideParser.ts)
+  ⎿  Added 1 line, removed 1 line
+      33    questions: ParsedQuestion[]
+      34  }
+      35  
+      36 -type ParseResult = {                                           
+      36 +export type ParseResult = {                                    
+      37    topics: TopicBlock[]
+      38    parsingIssues: string[]
+      39    /** Raw extracted lines for debugging — shown in the parse vi
+          ewer */
+
+● Update(src\questions\parse\studyguideParser.ts)
+  ⎿  Added 1 line, removed 4 lines
+      47    }
+      48  }
+      49  
+      50 -// Step in the multi-stage UI flow                             
+      51 -type Step = 'upload' | 'parsing' | 'review' | 'importing' | 'do
+         -ne'                                                            
+      52 -                                                               
+      50  // ------------------------------------------------------------
+          ---------------
+      51  // Constants
+      52  // ------------------------------------------------------------
+          ---------------
+      53  
+      57 -const VALID_LETTERS: ChoiceLetter[] = ['A', 'B', 'C', 'D']     
+      54 +export const VALID_LETTERS: ChoiceLetter[] = ['A', 'B', 'C', 'D
+         +']                                                             
+      55  
+      56  // Lines that should always be discarded before parsing begins
+      57  const JUNK_LINE_PATTERNS: RegExp[] = [
+
+● Update(src\questions\parse\studyguideParser.ts)
+  ⎿  Added 1 line, removed 1 line
+      148   *
+      149   * Returns the topic name portion (original spacing preserved,
+            trimmed), or null.
+      150   */
+      151 -function matchAnswerKeyHeader(line: string): string | null {  
+      151 +export function matchAnswerKeyHeader(line: string): string | n
+          +ull {                                                         
+      152    // Fast path: normal well-formed header
+      153    const direct = line.match(/^(.+?)\s+answer\s+key$/i)
+      154    if (direct) return direct[1].trim()
+
+● Update(src\questions\parse\studyguideParser.ts)
+  ⎿  Added 1 line, removed 1 line
+      183   * The 2017-20 PDF also has a "OBJECTIVE TEST ANSWER KEYS" sen
+           tinel, but
+      184   * we don't require it (same approach as DOCX fix).
+      185   */
+      186 -function parseAnswerKeysFromLines(                            
+      186 +export function parseAnswerKeysFromLines(                     
+      187    lines: string[]
+      188  ): Map<string, Record<number, ChoiceLetter>> {
+      189    const keys = new Map<string, Record<number, ChoiceLetter>>()
+
+● Update(src\questions\parse\studyguideParser.ts)
+  ⎿  Added 1 line, removed 1 line
+      493   * Detect whether this document uses the 2017-20 format (N) wi
+           th uppercase A))
+      494   * or the 2010-13 format (N. with lowercase a.).
+      495   */
+      496 -function detectFormat(lines: string[]): '2017' | '2010' {     
+      496 +export function detectFormat(lines: string[]): '2017' | '2010'
+          + {                                                            
+      497    for (const line of lines) {
+      498      if (/^\d+\)\s+\S/.test(line) && /^[A-D]\)\s/i.test(line)) 
+           return '2017'
+      499      if (/^\d+\.\s+\S/.test(line)) return '2010'
+
+● Update(src\questions\parse\studyguideParser.ts)
+  ⎿  Added 1 line, removed 1 line
+      509   * A topic block starts at a line matching "[TOPIC NAME] SAMPL
+           E QUESTIONS"
+      510   * and ends at the next such header or at the answer key secti
+           on.
+      511   */
+      512 -function parseTopicBlocks(                                    
+      512 +export function parseTopicBlocks(                             
+      513    bodyLines: string[],
+      514    answerKeys: Map<string, Record<number, ChoiceLetter>>
+      515  ): { topics: TopicBlock[]; issues: string[] } {
+
+● Update(src\questions\parse\studyguideParser.ts)
+  ⎿  Added 1 line, removed 1 line
+      752  }
+      753  
+      754  /** Normalise a topic name: lowercase, collapse whitespace, tr
+           im. */
+      755 -function normaliseTopicName(name: string): string {           
+      755 +export function normaliseTopicName(name: string): string {    
+      756    return name.toLowerCase().replace(/\s+/g, ' ').trim()
+      757  }
+      758  
+● Update(src\questions\parse\studyguideParser.ts)
+  ⎿  Added 1 line, removed 1 line
+      760   * Fuzzy-normalise: remove ALL spaces. Fallback for PDF mid-wo
+           rd splits
+      761   * e.g. "Pr ocedure" -> "procedure" matches "procedure".
+      762   */
+      763 -function normaliseTopicNameFuzzy(name: string): string {      
+      763 +export function normaliseTopicNameFuzzy(name: string): string 
+          +{                                                             
+      764    return name.toLowerCase().replace(/\s+/g, '')
+      765  }
+      766  
+
+● Update(src\questions\parse\studyguideParser.ts)
+  ⎿  Added 1 line, removed 1 line
+      796   * walker. For PDF and re-parse-from-text paths, answer keys a
+           re parsed directly
+      797   * from the lines (they appear as plain paragraphs in both tho
+           se cases).
+      798   */
+      799 -function parseFromLines(                                      
+      799 +export function parseFromLines(                               
+      800    lines: string[],
+      801    xmlDoc?: Document
+      802  ): ParseResult {
+
+● Update(src\questions\parse\studyguideParser.ts)
+  ⎿  Added 1 line, removed 1 line
+      808    return { topics, parsingIssues: issues, rawLines: lines, sta
+           ts: computeStats(topics) }
+      809  }
+      810  
+      811 -async function parseDocument(file: File): Promise<ParseResult>
+          - {                                                            
+      811 +export async function parseDocument(file: File): Promise<Parse
+          +Result> {                                                     
+      812    const buffer = await file.arrayBuffer()
+      813  
+      814    if (file.name.toLowerCase().endsWith('.pdf')) {
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Extraction typechecks. Now the regression test suite, built from the
+  documented real-world OCR quirks:
+
+● Write(src\questions\parse\studyguideParser.test.ts)
+  ⎿  Wrote 318 lines to src\questions\parse\studyguideParser.test.ts
+       1 /*
+       3  * Regression tests for the FBLA study guide parser. The weird i
+         nputs here are
+       4  * not hypothetical — each one reproduces an artifact actually s
+       5  * 2010-13 / 2017-20 guide PDFs (OCR spaces, misread parens, pac
+         ked answer
+         ne of these,
+       7  * a real guide import breaks with it.
+       8  */
+      10 import {
+     … +352 lines (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● All 29 parser tests pass on first run — extraction preserved behavior. Now
+  Phase 5, the TestShell split. Reading it fully to find safe seams:
+
+  Read 1 file (ctrl+o to expand)
+
+● Write(src\tests\testTypes.ts)
+  ⎿  Wrote 48 lines to src\tests\testTypes.ts
+       1 /*
+       2  * testTypes.ts
+       3  * Shared types, constants, and pure helpers for the test-taking
+          UI
+       4  * (TestShell, QuestionCard, useTestAttempt).
+       6 
+       7 export type Question = {
+       8   id: string
+       9   question_text: string
+      10   position: number
+     … +40 lines (ctrl+o to expand)
+
+● Write(src\tests\QuestionCard.tsx)
+  ⎿  Wrote 199 lines to src\tests\QuestionCard.tsx
+       1 /*
+       2  * QuestionCard.tsx
+         -for-review,
+       4  * and (in single/review modes) prev/next navigation. Extracted 
+         verbatim from
+         ion on every
+       6  * render.
+       7  */
+       9   DISPLAY_LABELS,
+      10   NAVY,
+     … +228 lines (ctrl+o to expand)
+
+● Write(src\tests\useTestAttempt.ts)
+  ⎿  Wrote 455 lines to src\tests\useTestAttempt.ts
+       1 /*
+       3  * All data loading, persistence, timer, and navigation state fo
+         r a test
+         is pure render.
+       6  * Persistence strategy (unchanged):
+       7  *   - selectAnswer / clearAnswer write to the DB immediately (f
+       8  *   - doSave() bulk-flushes every response row — called by the 
+         30-second
+         t
+         interval and
+     … +520 lines (ctrl+o to expand)
+
+● Write(src\tests\TestShell.tsx)
+  ⎿  Added 35 lines, removed 648 lines
+        1 +/*                                                            
+        2 + * TestShell.tsx                                              
+        3 + * The test-taking screen. All data loading, persistence, time
+          +r, and                                                        
+        4 + * navigation logic lives in useTestAttempt; the QuestionCard 
+          +is its own                                                    
+        5 + * component. This file is the layout: header/timer/submit, qu
+          +estion area,                                                  
+        6 + * palette footer, and the report-issue modal.                
+        7 + */                                                           
+        8  import { useEffect, useRef, useState } from 'react'
+        9  import { useParams, useNavigate } from 'react-router-dom'
+       10  import { supabase } from '@/lib/supabase'
+       11  import { useAuth } from '@/auth/useAuth'
+       12 +import { QuestionCard } from './QuestionCard'                 
+       13 +import { useTestAttempt } from './useTestAttempt'             
+       14 +import { NAVY, type ViewMode } from './testTypes'             
+       15  
+        6 -// -----------------------------------------------------------
+          -----------------                                              
+        7 -// Types                                                      
+        8 -// -----------------------------------------------------------
+          -----------------                                              
+        9 -type Question = {                                             
+       10 -  id: string                                                  
+       11 -  question_text: string                                       
+       12 -  position: number                                            
+       13 -}                                                             
+       14 -                                                              
+       15 -type AnswerChoice = {                                         
+       16 -  id: string                                                  
+       17 -  question_id: string                                         
+       18 -  choice_letter: string // original DB letter — used only for 
+          -matching display order, never shown as-is                     
+       19 -  choice_text: string                                         
+       20 -}                                                             
+       21 -                                                              
+       22 -type ResponseRow = {                                          
+       23 -  question_id: string                                         
+       24 -  selected_choice_id: string | null                           
+       25 -  displayed_choices_order: string[]                           
+       26 -  eliminated_choices: string[]                                
+       27 -  marked_for_review: boolean                                  
+       28 -  tab_switch_count: number                                    
+       29 -}                                                             
+       30 -                                                              
+       31 -type ViewMode = 'one' | 'all' | 'review'                      
+       32 -                                                              
+       33 -// Positional labels rendered to the user. Always A B C D top-
+          -to-bottom                                                     
+       34 -// regardless of the DB's internal choice_letter values.      
+       35 -const DISPLAY_LABELS = ['A', 'B', 'C', 'D']                   
+       36 -                                                              
+       37 -// Navy theme color — defined once so it's easy to update     
+       38 -const NAVY = '#1a2e5a'                                        
+       39 -                                                              
+       40 -// -----------------------------------------------------------
+          -----------------                                              
+       41 -// Helpers                                                    
+       42 -// -----------------------------------------------------------
+          -----------------                                              
+       43 -// Given a question's responses row and the raw choices from t
+          -he DB,                                                        
+       44 -// return choices sorted into the server-determined display or
+          -der.                                                          
+       45 -function orderChoices(row: ResponseRow | undefined, raw: Answe
+          -rChoice[]): AnswerChoice[] {                                  
+       46 -  if (!row?.displayed_choices_order?.length) return raw       
+       47 -  return row.displayed_choices_order                          
+       48 -    .map(letter => raw.find(c => c.choice_letter === letter)) 
+       49 -    .filter((c): c is AnswerChoice => c !== undefined)        
+       50 -}                                                             
+       51 -                                                              
+       52 -// -----------------------------------------------------------
+          -----------------                                              
+       53 -// Sub-components (defined outside to prevent re-creation on e
+          -very render)                                                  
+       54 -// -----------------------------------------------------------
+          -----------------                                              
+       55 -                                                              
+       56 -type QuestionCardProps = {                                    
+       57 -  question: Question                                          
+       58 -  responses: ResponseRow[]                                    
+       59 -  choices: AnswerChoice[]                                     
+       60 -  questions: Question[]                                       
+       61 -  viewMode: ViewMode                                          
+       62 -  currentIndex: number                                        
+       63 -  selectAnswer: (questionId: string, choiceId: string) => void
+       64 -  clearAnswer: (questionId: string) => void                   
+       65 -  toggleElimination: (questionId: string, choiceId: string) =>
+          - void                                                         
+       66 -  toggleMarked: (questionId: string) => void                  
+       67 -  openReport: (questionId: string) => void                    
+       68 -  goTo: (index: number) => void                               
+       69 -  prevIndex: () => number                                     
+       70 -  nextIndex: () => number                                     
+       71 -}                                                             
+       72 -                                                              
+       73 -function QuestionCard(props: QuestionCardProps) {             
+       74 -  const {                                                     
+       75 -    question, responses, choices, questions, viewMode, current
+          -Index,                                                        
+       76 -    selectAnswer, clearAnswer, toggleElimination, toggleMarked
+          -, openReport,                                                 
+       77 -    goTo, prevIndex, nextIndex,                               
+       78 -  } = props                                                   
+       79 -                                                              
+       80 -  const row = responses.find(r => r.question_id === question.i
+          -d)                                                            
+       81 -  const ordered = orderChoices(row, choices.filter(c => c.ques
+          -tion_id === question.id))                                     
+       82 -  const qIdx = questions.findIndex(q => q.id === question.id) 
+       83 -                                                              
+       84 -  return (                                                    
+       85 -    <div id={`q-${question.id}`} className="bg-white rounded-x
+          -l shadow-lg overflow-hidden">                                 
+       86 -                                                              
+       87 -      {/* ── dark navy question header band ──────────────────
+          -─────────────── */}                                           
+       88 -      <div                                                    
+       89 -        className="px-6 py-3 flex justify-between items-center
+          -"                                                             
+       90 -        style={{ backgroundColor: NAVY }}                     
+       91 -      >                                                       
+       92 -        <span className="text-white font-semibold text-sm trac
+          -king-wide">                                                   
+       93 -          Question #{qIdx + 1}                                
+       94 -        </span>                                               
+       95 -        <button                                               
+       96 -          type="button"                                       
+       97 -          onClick={() => openReport(question.id)}             
+       98 -          className="text-blue-200 hover:text-white text-xs bo
+          -rder border-blue-400 hover:border-white px-2 py-1 rounded tran
+          -sition-colors"                                                
+       99 -        >                                                     
+      100 -          Report Issue                                        
+      101 -        </button>                                             
+      102 -      </div>                                                  
+      103 -                                                              
+      104 -      <div className="p-6 space-y-5">                         
+      105 -                                                              
+      106 -        {/* ── question text ─────────────────────────────────
+          -───────────────── */}                                         
+      107 -        <p className="text-gray-900 text-base leading-relaxed"
+          ->                                                             
+      108 -          {question.question_text}                            
+      109 -        </p>                                                  
+      110 -                                                              
+      111 -        {/* ── answer choices ────────────────────────────────
+          -───────────────── */}                                         
+      112 -        <div className="space-y-2">                           
+      113 -          {ordered.map((choice, i) => {                       
+      114 -            const isEliminated = row?.eliminated_choices?.incl
+          -udes(choice.id) ?? false                                      
+      115 -            const isSelected   = row?.selected_choice_id === c
+          -hoice.id                                                      
+      116 -                                                              
+      117 -            // Determine styles for the choice row            
+      118 -            let rowClasses = 'flex-1 flex items-center gap-3 t
+          -ext-left px-4 py-3 rounded-lg border transition-colors'       
+      119 -            if (isEliminated) {                               
+      120 -              rowClasses += ' bg-gray-100 border-gray-200 text
+          --gray-400 line-through cursor-not-allowed'                    
+      121 -            } else if (isSelected) {                          
+      122 -              rowClasses += ' text-white border-transparent'  
+      123 -            } else {                                          
+      124 -              rowClasses += ' bg-white text-gray-800 border-gr
+          -ay-300 hover:bg-blue-50 hover:border-blue-300 cursor-pointer' 
+      125 -            }                                                 
+      126 -                                                              
+      127 -            // Radio circle styles                            
+      128 -            let radioClasses = 'w-5 h-5 rounded-full border-2 
+          -flex-shrink-0 flex items-center justify-center transition-colo
+          -rs'                                                           
+      129 -            if (isEliminated) {                               
+      130 -              radioClasses += ' border-gray-300'              
+      131 -            } else if (isSelected) {                          
+      132 -              radioClasses += ' border-white bg-white'        
+      133 -            } else {                                          
+      134 -              radioClasses += ' border-gray-400'              
+      135 -            }                                                 
+      136 -                                                              
+      137 -            return (                                          
+      138 -              <div key={choice.id} className="flex items-cente
+          -r gap-2">                                                     
+      139 -                {/* full-width choice button */}              
+      140 -                <button                                       
+      141 -                  type="button"                               
+      142 -                  onClick={() => !isEliminated && selectAnswer
+          -(question.id, choice.id)}                                     
+      143 -                  disabled={isEliminated}                     
+      144 -                  className={rowClasses}                      
+      145 -                  style={isSelected ? { backgroundColor: NAVY,
+          - borderColor: NAVY } : undefined}                             
+      146 -                >                                             
+      147 -                  {/* radio circle */}                        
+      148 -                  <span className={radioClasses}>             
+      149 -                    {isSelected && (                          
+      150 -                      <span                                   
+      151 -                        className="w-2.5 h-2.5 rounded-full bl
+          -ock"                                                          
+      152 -                        style={{ backgroundColor: NAVY }}     
+      153 -                      />                                      
+      154 -                    )}                                        
+      155 -                  </span>                                     
+      156 -                                                              
+      157 -                  {/* letter label */}                        
+      158 -                  <span className="font-semibold text-sm w-4 f
+          -lex-shrink-0">                                                
+      159 -                    {DISPLAY_LABELS[i]}.                      
+      160 -                  </span>                                     
+      161 -                                                              
+      162 -                  {/* choice text */}                         
+      163 -                  <span className="text-sm">{choice.choice_tex
+          -t}</span>                                                     
+      164 -                </button>                                     
+      165 -                                                              
+      166 -                {/* elimination toggle — subtle ✕ icon */}    
+      167 -                <button                                       
+      168 -                  type="button"                               
+      169 -                  onClick={() => toggleElimination(question.id
+          -, choice.id)}                                                 
+      170 -                  title={isEliminated ? 'Un-eliminate' : 'Elim
+          -inate this choice'}                                           
+      171 -                  className={[                                
+      172 -                    'w-7 h-7 flex items-center justify-center 
+          -rounded text-xs transition-colors flex-shrink-0',             
+      173 -                    isEliminated                              
+      174 -                      ? 'bg-red-100 text-red-500 hover:bg-red-
+          -200'                                                          
+      175 -                      : 'text-gray-300 hover:text-gray-500 hov
+          -er:bg-gray-100',                                              
+      176 -                  ].join(' ')}                                
+      177 -                >                                             
+      178 -                  ✕                                           
+      179 -                </button>                                     
+      180 -              </div>                                          
+      181 -            )                                                 
+      182 -          })}                                                 
+      183 -        </div>                                                
+      184 -                                                              
+      185 -        {/* ── bottom row: mark for review + clear answer ────
+          -───────────────── */}                                         
+      186 -        <div className="flex items-center justify-between pt-3
+          - border-t border-gray-100">                                   
+      187 -          <label className="flex items-center gap-2 cursor-poi
+          -nter select-none">                                            
+      188 -            <input                                            
+      189 -              type="checkbox"                                 
+      190 -              checked={row?.marked_for_review ?? false}       
+      191 -              onChange={() => toggleMarked(question.id)}      
+      192 -              className="w-4 h-4 rounded"                     
+      193 -              style={{ accentColor: NAVY }}                   
+      194 -            />                                                
+      195 -            <span className="text-sm text-gray-700">          
+      196 -              I want to review this again before I submit     
+      197 -            </span>                                           
+      198 -          </label>                                            
+      199 -                                                              
+      200 -          {/* clear answer button — only shown when a choice i
+          -s selected */}                                                
+      201 -          {row?.selected_choice_id && (                       
+      202 -            <button                                           
+      203 -              type="button"                                   
+      204 -              onClick={() => clearAnswer(question.id)}        
+      205 -              className="text-xs text-gray-500 border border-g
+          -ray-300 px-3 py-1.5 rounded hover:bg-gray-50 flex items-center
+          - gap-1.5 transition-colors flex-shrink-0 ml-4"                
+      206 -            >                                                 
+      207 -              <span>⬆</span>                                  
+      208 -              <span>Clear Answer</span>                       
+      209 -            </button>                                         
+      210 -          )}                                                  
+      211 -        </div>                                                
+      212 -                                                              
+      213 -        {/* ── prev / next — only in one-at-a-time and review 
+          -modes ─────────── */}                                         
+      214 -        {viewMode !== 'all' && (                              
+      215 -          <div className="flex justify-between pt-2 border-t b
+          -order-gray-100">                                              
+      216 -            <button                                           
+      217 -              type="button"                                   
+      218 -              onClick={() => goTo(prevIndex())}               
+      219 -              disabled={prevIndex() === currentIndex}         
+      220 -              className="px-4 py-2 border border-gray-300 roun
+          -ded-lg text-sm text-gray-700 disabled:opacity-30 hover:bg-gray
+          --50 transition-colors"                                        
+      221 -            >                                                 
+      222 -              ← Previous                                      
+      223 -            </button>                                         
+      224 -            <button                                           
+      225 -              type="button"                                   
+      226 -              onClick={() => goTo(nextIndex())}               
+      227 -              disabled={nextIndex() === currentIndex}         
+      228 -              className="px-4 py-2 border border-gray-300 roun
+          -ded-lg text-sm text-gray-700 disabled:opacity-30 hover:bg-gray
+          --50 transition-colors"                                        
+      229 -            >                                                 
+      230 -              Next →                                          
+      231 -            </button>                                         
+      232 -          </div>                                              
+      233 -        )}                                                    
+      234 -      </div>                                                  
+      235 -    </div>                                                    
+      236 -  )                                                           
+      237 -}                                                             
+      238 -                                                              
+      239 -// -----------------------------------------------------------
+          -----------------                                              
+      240 -// Main component                                             
+      241 -// -----------------------------------------------------------
+          -----------------                                              
+       16  export default function TestShell() {
+       17    const { id: attemptIdParam } = useParams<{ id: string }>()
+       18    const navigate = useNavigate()
+     ...
+       20    // Anonymous sessions: after results, route to /login instea
+           d of dashboard.
+       21    const isAnonymous = !!(user as any)?.is_anonymous
+       22  
+      249 -  // ── core data ────────────────────────────────────────────
+          -──────────────                                                
+      250 -  const [attemptId, setAttemptId] = useState<string | null>(nu
+          -ll)                                                           
+      251 -  const [questions, setQuestions] = useState<Question[]>([])  
+      252 -  const [choices, setChoices] = useState<AnswerChoice[]>([])  
+      253 -  const [responses, setResponses] = useState<ResponseRow[]>([]
+          -)                                                             
+      254 -  const [currentIndex, setCurrentIndex] = useState(0)         
+      255 -  const [loading, setLoading] = useState(true)                
+      256 -  const [error, setError] = useState<string | null>(null)     
+       23 +  const {                                                     
+       24 +    attemptId,                                                
+       25 +    questions,                                                
+       26 +    choices,                                                  
+       27 +    responses,                                                
+       28 +    currentIndex,                                             
+       29 +    setCurrentIndex,                                          
+       30 +    loading,                                                  
+       31 +    error,                                                    
+       32 +    timeRemaining,                                            
+       33 +    submitting,                                               
+       34 +    submitted,                                                
+       35 +    score,                                                    
+       36 +    viewMode,                                                 
+       37 +    selectAnswer,                                             
+       38 +    clearAnswer,                                              
+       39 +    toggleElimination,                                        
+       40 +    toggleMarked,                                             
+       41 +    goTo,                                                     
+       42 +    prevIndex,                                                
+       43 +    nextIndex,                                                
+       44 +    switchViewMode,                                           
+       45 +    handleSubmit,                                             
+       46 +  } = useTestAttempt(attemptIdParam)                          
+       47  
+      258 -  // ── timer ────────────────────────────────────────────────
+          -──────────────                                                
+      259 -  const [timeRemaining, setTimeRemaining] = useState<number | 
+          -null>(null)                                                   
+      260 -  const [timerActive, setTimerActive] = useState(false)       
+      261 -                                                              
+      262 -  // ── submit ───────────────────────────────────────────────
+          -──────────────                                                
+      263 -  const [submitting, setSubmitting] = useState(false)         
+      264 -  const [submitted, setSubmitted] = useState(false)           
+      265 -  const [score, setScore] = useState<{ score: number; total: n
+          -umber } | null>(null)                                         
+      266 -                                                              
+      267 -  // ── view mode ────────────────────────────────────────────
+          -──────────────                                                
+      268 -  const [viewMode, setViewMode] = useState<ViewMode>('one')   
+      269 -                                                              
+       48    // ── report issue modal ───────────────────────────────────
+           ──────────────
+       49    const [reportState, setReportState] = useState<{
+       50      questionId: string | null
+     ...
+       55      error: string | null
+       56    }>({ questionId: null, difficulty: null, quality: null, text
+           : '', submitting: false, error: null })
+       57  
+      280 -  // ── refs ─────────────────────────────────────────────────
+          -──────────────                                                
+      281 -  // currentIndex ref so the visibilitychange handler always r
+          -eads the                                                      
+      282 -  // freshest index without needing to be torn down and re-add
+          -ed every render.                                              
+      283 -  const currentIndexRef = useRef(0)                           
+      284 -  currentIndexRef.current = currentIndex                      
+      285 -                                                              
+      286 -  // autosave interval handle — stored in a ref so handleSubmi
+          -t can clear it                                                
+      287 -  // without depending on effect closure timing.              
+      288 -  const autosaveRef = useRef<ReturnType<typeof setInterval> | 
+          -null>(null)                                                   
+      289 -                                                              
+      290 -  // responses ref — mirrors state every render so that doSave
+          -() and the                                                    
+      291 -  // autosave interval always read the latest values without n
+          -eeding                                                        
+      292 -  // responses in any effect dep array (which would reset the 
+          -interval).                                                    
+      293 -  const responsesRef = useRef<ResponseRow[]>([])              
+      294 -  responsesRef.current = responses                            
+      295 -                                                              
+       58    // Ref for the palette scroll container — used to auto-scrol
+           l the active button into view.
+       59    const paletteRef = useRef<HTMLDivElement>(null)
+       60  
+      299 -  // ---------------------------------------------------------
+          -------------------                                            
+      300 -  // Read attemptId from URL on mount                         
+      301 -  // ---------------------------------------------------------
+          -------------------                                            
+      302 -  useEffect(() => {                                           
+      303 -    if (!attemptIdParam) {                                    
+      304 -      setError('No test attempt ID provided.')                
+      305 -      setLoading(false)                                       
+      306 -      return                                                  
+      307 -    }                                                         
+      308 -    setAttemptId(attemptIdParam)                              
+      309 -  }, [attemptIdParam])                                        
+      310 -                                                              
+      311 -  // ---------------------------------------------------------
+          -------------------                                            
+      312 -  // Load test data after attemptId is set                    
+      313 -  // ---------------------------------------------------------
+          -------------------                                            
+      314 -  useEffect(() => {                                           
+      315 -    if (!attemptId) return                                    
+      316 -                                                              
+      317 -    async function loadTest() {                               
+      318 -      setLoading(true)                                        
+      319 -      setError(null)                                          
+      320 -                                                              
+      321 -      // 1. Get attempt metadata (including timer settings)   
+      322 -      const { data: attemptRow, error: attemptError } = await 
+          -supabase                                                      
+      323 -        .from('test_attempts')                                
+      324 -        .select('started_at, use_timer, minutes')             
+      325 -        .eq('id', attemptId)                                  
+      326 -        .single()                                             
+      327 -                                                              
+      328 -      if (attemptError) {                                     
+      329 -        setError('Failed to load test.')                      
+      330 -        setLoading(false)                                     
+      331 -        return                                                
+      332 -      }                                                       
+      333 -                                                              
+      334 -      // 2. Set started_at only if not already set (safe on re
+          -fresh)                                                        
+      335 -      if (!attemptRow.started_at) {                           
+      336 -        await supabase                                        
+      337 -          .from('test_attempts')                              
+      338 -          .update({ started_at: new Date().toISOString() })   
+      339 -          .eq('id', attemptId)                                
+      340 -      }                                                       
+      341 -                                                              
+      342 -      // 3. Configure timer if enabled                        
+      343 -      if (attemptRow.use_timer && attemptRow.minutes) {       
+      344 -        setTimeRemaining(attemptRow.minutes * 60)             
+      345 -      }                                                       
+      346 -                                                              
+      347 -      // 4. Questions ordered by position                     
+      348 -      const { data: aqRows, error: aqErr } = await supabase   
+      349 -        .from('attempt_questions')                            
+      350 -        .select('question_id, position, questions(id, question
+          -_text)')                                                      
+      351 -        .eq('attempt_id', attemptId)                          
+      352 -        .order('position')                                    
+      353 -                                                              
+      354 -      if (aqErr) {                                            
+      355 -        setError('Failed to load questions.')                 
+      356 -        setLoading(false)                                     
+      357 -        return                                                
+      358 -      }                                                       
+      359 -                                                              
+      360 -      // 5. Answer choices — bulk fetch for all questions in o
+          -ne query                                                      
+      361 -      const qIds = aqRows.map((r: any) => r.question_id)      
+      362 -      const { data: choiceRows, error: chErr } = await supabas
+          -e                                                             
+      363 -        .from('answer_choices')                               
+      364 -        .select('id, question_id, choice_letter, choice_text')
+      365 -        .in('question_id', qIds)                              
+      366 -                                                              
+      367 -      if (chErr) {                                            
+      368 -        setError('Failed to load choices.')                   
+      369 -        setLoading(false)                                     
+      370 -        return                                                
+      371 -      }                                                       
+      372 -                                                              
+      373 -      // 6. Response rows — every field needed to hydrate UI s
+          -tate                                                          
+      374 -      const { data: respRows, error: respErr } = await supabas
+          -e                                                             
+      375 -        .from('question_responses')                           
+      376 -        .select(                                              
+      377 -          'question_id, selected_choice_id, displayed_choices_
+          -order, ' +                                                    
+      378 -          'eliminated_choices, marked_for_review, tab_switch_c
+          -ount'                                                         
+      379 -        )                                                     
+      380 -        .eq('attempt_id', attemptId)                          
+      381 -                                                              
+      382 -      if (respErr) {                                          
+      383 -        setError('Failed to load responses.')                 
+      384 -        setLoading(false)                                     
+      385 -        return                                                
+      386 -      }                                                       
+      387 -                                                              
+      388 -      // 7. Commit all state atomically                       
+      389 -      setQuestions(aqRows.map((r: any) => ({                  
+      390 -        id: r.questions.id,                                   
+      391 -        question_text: r.questions.question_text,             
+      392 -        position: r.position,                                 
+      393 -      })))                                                    
+      394 -      setChoices(choiceRows as AnswerChoice[])                
+      395 -      // Cast via unknown: supabase-js cannot statically parse
+          - this select                                                  
+      396 -      // string, so it falls back to an error type.           
+      397 -      setResponses(respRows as unknown as ResponseRow[])      
+      398 -      setLoading(false)                                       
+      399 -                                                              
+      400 -      // 8. Start timer after data is visible                 
+      401 -      if (attemptRow.use_timer && attemptRow.minutes) {       
+      402 -        setTimerActive(true)                                  
+      403 -      }                                                       
+      404 -    }                                                         
+      405 -                                                              
+      406 -    loadTest()                                                
+      407 -  }, [attemptId])                                             
+      408 -                                                              
+      409 -  // ---------------------------------------------------------
+          -------------------                                            
+      410 -  // Timer countdown — ticks every second when active         
+      411 -  // ---------------------------------------------------------
+          -------------------                                            
+      412 -  useEffect(() => {                                           
+      413 -    if (!timerActive || timeRemaining === null || submitted) r
+          -eturn                                                         
+      414 -    if (timeRemaining <= 0) { handleSubmit(); return }        
+      415 -                                                              
+      416 -    const id = setInterval(() =>                              
+      417 -      setTimeRemaining(prev => (prev !== null && prev > 0 ? pr
+          -ev - 1 : 0)), 1000)                                           
+      418 -    return () => clearInterval(id)                            
+      419 -  }, [timerActive, timeRemaining, submitted])                 
+      420 -                                                              
+      421 -  // ---------------------------------------------------------
+          -------------------                                            
+      422 -  // Autosave — flush all response state to the DB every 30 se
+          -conds.                                                        
+      423 -  // The per-click saves on selectAnswer are the fast path; th
+          -is is the safety net.                                         
+      424 -  // ---------------------------------------------------------
+          -------------------                                            
+      425 -  useEffect(() => {                                           
+      426 -    if (!attemptId || loading || submitted) return            
+      427 -                                                              
+      428 -    autosaveRef.current = setInterval(() => doSave(), 30_000) 
+      429 -    return () => { if (autosaveRef.current) clearInterval(auto
+          -saveRef.current) }                                            
+      430 -  }, [attemptId, loading, submitted])                         
+      431 -                                                              
+      432 -  // ---------------------------------------------------------
+          -------------------                                            
+      433 -  // Tab tracking — count how many times the user leaves the t
+          -ab.                                                           
+      434 -  // Incremented against whichever question is currently activ
+          -e.                                                            
+      435 -  // ---------------------------------------------------------
+          -------------------                                            
+      436 -  useEffect(() => {                                           
+      437 -    if (!attemptId || loading || submitted) return            
+      438 -                                                              
+      439 -    function onVisibilityChange() {                           
+      440 -      if (!document.hidden) return // only count tab-away even
+          -ts                                                            
+      441 -      const qId = questions[currentIndexRef.current]?.id      
+      442 -      if (!qId) return                                        
+      443 -      setResponses(prev =>                                    
+      444 -        prev.map(r =>                                         
+      445 -          r.question_id === qId                               
+      446 -            ? { ...r, tab_switch_count: r.tab_switch_count + 1
+          - }                                                            
+      447 -            : r                                               
+      448 -        )                                                     
+      449 -      )                                                       
+      450 -    }                                                         
+      451 -                                                              
+      452 -    document.addEventListener('visibilitychange', onVisibility
+          -Change)                                                       
+      453 -    return () => document.removeEventListener('visibilitychang
+          -e', onVisibilityChange)                                       
+      454 -  }, [attemptId, loading, submitted, questions])              
+      455 -                                                              
+       61    // Auto-scroll the active palette button into view whenever 
+           currentIndex changes.
+       62    useEffect(() => {
+       63      if (!paletteRef.current) return
+     ...
+       66    }, [currentIndex])
+       67  
+       68    // ---------------------------------------------------------
+           ------------------
+      464 -  // Persistence helpers                                      
+      465 -  // ---------------------------------------------------------
+          -------------------                                            
+      466 -                                                              
+      467 -  // Push every response row to the DB sequentially.          
+      468 -  // Used by the autosave interval and by the final flush befo
+          -re submit.                                                    
+      469 -  async function doSave() {                                   
+      470 -    if (!attemptId) return                                    
+      471 -    for (const r of responsesRef.current) {                   
+      472 -      await supabase                                          
+      473 -        .from('question_responses')                           
+      474 -        .update({                                             
+      475 -          selected_choice_id: r.selected_choice_id,           
+      476 -          eliminated_choices: r.eliminated_choices,           
+      477 -          marked_for_review: r.marked_for_review,             
+      478 -          tab_switch_count: r.tab_switch_count,               
+      479 -        })                                                    
+      480 -        .eq('attempt_id', attemptId)                          
+      481 -        .eq('question_id', r.question_id)                     
+      482 -    }                                                         
+      483 -  }                                                           
+      484 -                                                              
+      485 -  // ---------------------------------------------------------
+          -------------------                                            
+      486 -  // Answer selection — optimistic update with rollback on err
+          -or                                                            
+      487 -  // ---------------------------------------------------------
+          -------------------                                            
+      488 -  async function selectAnswer(questionId: string, choiceId: st
+          -ring) {                                                       
+      489 -    if (!attemptId || submitting || submitted) return         
+      490 -                                                              
+      491 -    // Guard: cannot select an eliminated choice              
+      492 -    const row = responses.find(r => r.question_id === question
+          -Id)                                                           
+      493 -    if (row?.eliminated_choices?.includes(choiceId)) return   
+      494 -                                                              
+      495 -    const previousChoiceId = row?.selected_choice_id ?? null  
+      496 -                                                              
+      497 -    // Optimistic UI update                                   
+      498 -    setResponses(prev =>                                      
+      499 -      prev.map(r => r.question_id === questionId ? { ...r, sel
+          -ected_choice_id: choiceId } : r)                              
+      500 -    )                                                         
+      501 -                                                              
+      502 -    // Persist to DB                                          
+      503 -    const { error } = await supabase                          
+      504 -      .from('question_responses')                             
+      505 -      .update({ selected_choice_id: choiceId })               
+      506 -      .eq('attempt_id', attemptId)                            
+      507 -      .eq('question_id', questionId)                          
+      508 -                                                              
+      509 -    if (error) {                                              
+      510 -      // Rollback and surface the error                       
+      511 -      setResponses(prev =>                                    
+      512 -        prev.map(r => r.question_id === questionId ? { ...r, s
+          -elected_choice_id: previousChoiceId } : r)                    
+      513 -      )                                                       
+      514 -      setError('Failed to save answer. Please try again.')    
+      515 -    }                                                         
+      516 -  }                                                           
+      517 -                                                              
+      518 -  // ---------------------------------------------------------
+          -------------------                                            
+      519 -  // Clear answer — deselects the current answer for a questio
+          -n                                                             
+      520 -  // ---------------------------------------------------------
+          -------------------                                            
+      521 -  async function clearAnswer(questionId: string) {            
+      522 -    if (!attemptId || submitting || submitted) return         
+      523 -                                                              
+      524 -    const row = responses.find(r => r.question_id === question
+          -Id)                                                           
+      525 -    const previousChoiceId = row?.selected_choice_id ?? null  
+      526 -                                                              
+      527 -    // Optimistic UI update                                   
+      528 -    setResponses(prev =>                                      
+      529 -      prev.map(r => r.question_id === questionId ? { ...r, sel
+          -ected_choice_id: null } : r)                                  
+      530 -    )                                                         
+      531 -                                                              
+      532 -    // Persist to DB                                          
+      533 -    const { error } = await supabase                          
+      534 -      .from('question_responses')                             
+      535 -      .update({ selected_choice_id: null })                   
+      536 -      .eq('attempt_id', attemptId)                            
+      537 -      .eq('question_id', questionId)                          
+      538 -                                                              
+      539 -    if (error) {                                              
+      540 -      // Rollback on failure                                  
+      541 -      setResponses(prev =>                                    
+      542 -        prev.map(r => r.question_id === questionId ? { ...r, s
+          -elected_choice_id: previousChoiceId } : r)                    
+      543 -      )                                                       
+      544 -      setError('Failed to clear answer. Please try again.')   
+      545 -    }                                                         
+      546 -  }                                                           
+      547 -                                                              
+      548 -  // ---------------------------------------------------------
+          -------------------                                            
+      549 -  // Elimination toggle                                       
+      550 -  // ---------------------------------------------------------
+          -------------------                                            
+      551 -  function toggleElimination(questionId: string, choiceId: str
+          -ing) {                                                        
+      552 -    if (submitting || submitted) return                       
+      553 -                                                              
+      554 -    setResponses(prev =>                                      
+      555 -      prev.map(r => {                                         
+      556 -        if (r.question_id !== questionId) return r            
+      557 -                                                              
+      558 -        const wasEliminated = r.eliminated_choices.includes(ch
+          -oiceId)                                                       
+      559 -        const newEliminated = wasEliminated                   
+      560 -          ? r.eliminated_choices.filter(id => id !== choiceId)
+      561 -          : [...r.eliminated_choices, choiceId]               
+      562 -                                                              
+      563 -        // If we're eliminating a currently-selected choice, d
+          -eselect it first                                              
+      564 -        const newSelected =                                   
+      565 -          !wasEliminated && r.selected_choice_id === choiceId 
+      566 -            ? null                                            
+      567 -            : r.selected_choice_id                            
+      568 -                                                              
+      569 -        return { ...r, eliminated_choices: newEliminated, sele
+          -cted_choice_id: newSelected }                                 
+      570 -      })                                                      
+      571 -    )                                                         
+      572 -                                                              
+      573 -    // Persist the deselection immediately if we just knocked 
+          -out the selected choice                                       
+      574 -    const row = responses.find(r => r.question_id === question
+          -Id)                                                           
+      575 -    const wasEliminated = row?.eliminated_choices.includes(cho
+          -iceId)                                                        
+      576 -    if (!wasEliminated && row?.selected_choice_id === choiceId
+          -) {                                                           
+      577 -      supabase                                                
+      578 -        .from('question_responses')                           
+      579 -        .update({ selected_choice_id: null })                 
+      580 -        .eq('attempt_id', attemptId)                          
+      581 -        .eq('question_id', questionId)                        
+      582 -    }                                                         
+      583 -  }                                                           
+      584 -                                                              
+      585 -  // ---------------------------------------------------------
+          -------------------                                            
+      586 -  // Mark for review toggle                                   
+      587 -  // ---------------------------------------------------------
+          -------------------                                            
+      588 -  function toggleMarked(questionId: string) {                 
+      589 -    if (submitting || submitted) return                       
+      590 -    setResponses(prev =>                                      
+      591 -      prev.map(r => r.question_id === questionId ? { ...r, mar
+          -ked_for_review: !r.marked_for_review } : r)                   
+      592 -    )                                                         
+      593 -  }                                                           
+      594 -                                                              
+      595 -  // ---------------------------------------------------------
+          -------------------                                            
+      596 -  // Navigation                                               
+      597 -  // ---------------------------------------------------------
+          -------------------                                            
+      598 -  function goTo(index: number) {                              
+      599 -    if (index >= 0 && index < questions.length) setCurrentInde
+          -x(index)                                                      
+      600 -  }                                                           
+      601 -                                                              
+      602 -  // In review mode, prev/next skip to the nearest marked ques
+          -tion.                                                         
+      603 -  function prevIndex(): number {                              
+      604 -    if (viewMode === 'review') {                              
+      605 -      for (let i = currentIndex - 1; i >= 0; i--) {           
+      606 -        if (responses.find(r => r.question_id === questions[i]
+          -.id)?.marked_for_review) return i                             
+      607 -      }                                                       
+      608 -      return currentIndex // no earlier marked question — stay
+          - put                                                          
+      609 -    }                                                         
+      610 -    return Math.max(0, currentIndex - 1)                      
+      611 -  }                                                           
+      612 -                                                              
+      613 -  function nextIndex(): number {                              
+      614 -    if (viewMode === 'review') {                              
+      615 -      for (let i = currentIndex + 1; i < questions.length; i++
+          -) {                                                           
+      616 -        if (responses.find(r => r.question_id === questions[i]
+          -.id)?.marked_for_review) return i                             
+      617 -      }                                                       
+      618 -      return currentIndex                                     
+      619 -    }                                                         
+      620 -    return Math.min(questions.length - 1, currentIndex + 1)   
+      621 -  }                                                           
+      622 -                                                              
+      623 -  // When switching to review mode, snap to the first marked q
+          -uestion                                                       
+      624 -  // so prev/next don't start from an unmarked position.      
+      625 -  function switchViewMode(mode: ViewMode) {                   
+      626 -    setViewMode(mode)                                         
+      627 -    if (mode === 'review') {                                  
+      628 -      for (let i = 0; i < questions.length; i++) {            
+      629 -        if (responses.find(r => r.question_id === questions[i]
+          -.id)?.marked_for_review) {                                    
+      630 -          setCurrentIndex(i)                                  
+      631 -          return                                              
+      632 -        }                                                     
+      633 -      }                                                       
+      634 -      // Nothing marked — index stays; the render path shows a
+          - message                                                      
+      635 -    }                                                         
+      636 -  }                                                           
+      637 -                                                              
+      638 -  // ---------------------------------------------------------
+          -------------------                                            
+      639 -  // Submit                                                   
+      640 -  // ---------------------------------------------------------
+          -------------------                                            
+      641 -  async function handleSubmit() {                             
+      642 -    if (!attemptId || submitting || submitted) return         
+      643 -                                                              
+      644 -    const confirmed = window.confirm(                         
+      645 -      'Are you sure you want to submit? You cannot change your
+          - answers after submitting.'                                   
+      646 -    )                                                         
+      647 -    if (!confirmed) return                                    
+      648 -                                                              
+      649 -    setSubmitting(true)                                       
+      650 -    setTimerActive(false)                                     
+      651 -                                                              
+      652 -    // Stop the autosave interval                             
+      653 -    if (autosaveRef.current) {                                
+      654 -      clearInterval(autosaveRef.current)                      
+      655 -      autosaveRef.current = null                              
+      656 -    }                                                         
+      657 -                                                              
+      658 -    // Final flush — every row, every field, right now        
+      659 -    await doSave()                                            
+      660 -                                                              
+      661 -    // Write total tab-switch count onto the attempt row      
+      662 -    const totalSwitches = responses.reduce((sum, r) => sum + r
+          -.tab_switch_count, 0)                                         
+      663 -    await supabase                                            
+      664 -      .from('test_attempts')                                  
+      665 -      .update({ out_of_browser_seconds: totalSwitches })      
+      666 -      .eq('id', attemptId)                                    
+      667 -                                                              
+      668 -    // Score the attempt server-side                          
+      669 -    const { data, error } = await supabase.rpc('submit_test', 
+          -{ p_attempt_id: attemptId })                                  
+      670 -    if (error) {                                              
+      671 -      setError(`Failed to submit: ${error.message}`)          
+      672 -      setSubmitting(false)                                    
+      673 -      return                                                  
+      674 -    }                                                         
+      675 -                                                              
+      676 -    setScore(data as { score: number; total: number })        
+      677 -    setSubmitted(true)                                        
+      678 -    setSubmitting(false)                                      
+      679 -  }                                                           
+      680 -                                                              
+      681 -  // ---------------------------------------------------------
+          -------------------                                            
+       69    // Report Issue
+       70    // ---------------------------------------------------------
+           ------------------
+       71    function openReport(questionId: string) {
+     ...
+       453        )}
+       454      </div>
+       455    )
+      1069 -}                                                            
+       456   No newline at end of file
+       457 +}                                                            
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● The feedback modal and bulk-import modal are the clean seams. Let me read
+  their render blocks:
+
+  Read 1 file (ctrl+o to expand)
+
+● The feedback modal is fully self-contained. Let me also read the bulk-import
+  block to extract both:
+
+  Read 1 file (ctrl+o to expand)
+
+● Now creating the two extracted modal components:
+
+● Write(src\questions\QuestionFeedbackModal.tsx)  ⎿  Wrote 196 lines to src\questions\QuestionFeedbackModal.tsx
+       1 /*
+       2  * QuestionFeedbackModal.tsx
+       3  * Admin modal showing all user feedback for one question — summ
+       4  * written comments, and ratings-only responses. Fetches its own
+          data on mount;
+       5  * extracted from QuestionsAdmin.tsx.
+       6  */
+       7 import { useEffect, useState } from 'react'
+       9 
+      10 type QuestionFeedback = {
+     … +232 lines (ctrl+o to expand)
+
+● Write(src\questions\BulkImportModal.tsx)
+  ⎿  Wrote 335 lines to src\questions\BulkImportModal.tsx
+       1 /*
+       2  * BulkImportModal.tsx
+         -validated
+       4  * file upload with preview) and a DOCX tab (generic + FBLA stud
+         y guide
+       6  */
+       7 import { useRef, useState } from 'react'
+       8 import { supabase } from '@/lib/supabase'
+      10 import { bulkImportSchema, type BulkImportData } from './questio
+         n.schema'
+     … +386 lines (ctrl+o to expand)
+
+● Now stripping the extracted code out of QuestionsAdmin:
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● Update(src\questions\QuestionsAdmin.tsx)
+  ⎿  Added 3 lines, removed 3 lines
+      1  import { useEffect, useState, useRef, useCallback } from 'react'
+      2  import { supabase } from '@/lib/supabase'
+      3 -import { questionSchema, bulkImportSchema, type QuestionFormData
+        -, type BulkImportData } from './question.schema'                
+      3 +import { questionSchema, type QuestionFormData } from './questio
+        +n.schema'                                                       
+      4  import { useAuth } from '@/auth/useAuth'
+      5 -import { DocxImport } from './DocxImport'                       
+      6 -import { DocxImportFBLA } from './DocxImportStudyguides'        
+      5 +import { BulkImportModal } from './BulkImportModal'             
+      6 +import { QuestionFeedbackModal } from './QuestionFeedbackModal' 
+      7  
+      8  // -------------------------------------------------------------
+         --------------
+      9  // Types
+
+● Update(src\questions\QuestionsAdmin.tsx)
+  ⎿  Removed 9 lines
+      32    is_correct: boolean
+      33  }
+      34  
+      35 -type QuestionFeedback = {                                      
+      36 -  id: string                                                   
+      37 -  user_email: string                                           
+      38 -  difficulty_rating: number | null                             
+      39 -  quality_rating: number | null                                
+      40 -  feedback_text: string | null                                 
+      41 -  created_at: string                                           
+      42 -}                                                              
+      43 -                                                               
+      35  type SortKey = 'date_desc' | 'date_asc' | 'topic_asc' | 'diffic
+          ulty_asc' | 'difficulty_desc'
+      36  
+      37  const LETTERS = ['A', 'B', 'C', 'D'] as const
+
+● Update(src\questions\QuestionsAdmin.tsx)
+  ⎿  Added 1 line, removed 8 lines
+      81  
+      82    // --- Feedback modal ---
+      83    const [feedbackQuestion, setFeedbackQuestion]   = useState<Qu
+          estion | null>(null)
+      84 -  const [feedbackItems, setFeedbackItems]         = useState<Qu
+         -estionFeedback[]>([])                                          
+      85 -  const [loadingFeedback, setLoadingFeedback]     = useState(fa
+         -lse)                                                           
+      84  
+      87 -  // --- Bulk import state ---                                 
+      85 +  // --- Bulk import modal ---                                 
+      86    const [showImportModal, setShowImportModal]   = useState(fals
+          e)
+      89 -  const [importData, setImportData]             = useState<Bulk
+         -ImportData | null>(null)                                       
+      90 -  const [importErrors, setImportErrors]         = useState<stri
+         -ng[]>([])                                                      
+      91 -  const [importing, setImporting]               = useState(fals
+         -e)                                                             
+      92 -  const [importSuccess, setImportSuccess]       = useState<{ co
+         -unt: number; topic: string } | null>(null)                     
+      87    const [importTab, setImportTab]               = useState<'jso
+          n' | 'docx'>('json')
+      94 -  const fileInputRef = useRef<HTMLInputElement>(null)          
+      88  
+      89    // ----------------------------------------------------------
+          -----------------
+      90    // Topics — loaded once on mount (always a small list)
+
+● Update(src\questions\QuestionsAdmin.tsx)
+  ⎿  Removed 188 lines
+      347    }
+      348  
+      349    // ---------------------------------------------------------
+           ------------------
+      350 -  // Feedback modal                                           
+      351 -  // ---------------------------------------------------------
+          -------------------                                            
+      352 -                                                              
+      353 -  async function openFeedback(question: Question) {           
+      354 -    setFeedbackQuestion(question)                             
+      355 -    setFeedbackItems([])                                      
+      356 -    setLoadingFeedback(true)                                  
+      357 -                                                              
+      358 -    try {                                                     
+      359 -      // users(email) is a LEFT join on purpose. With users!in
+          -ner(email), RLS                                               
+      360 -      // on the users table silently filters out feedback rows
+          - whose author row                                             
+      361 -      // the admin cannot read — the whole list comes back emp
+          -ty. With a left                                               
+      362 -      // join the feedback row survives and the email just com
+          -es back null.                                                 
+      363 -      const { data, error: fbErr } = await supabase           
+      364 -        .from('question_feedback')                            
+      365 -        .select('id, difficulty_rating, quality_rating, feedba
+          -ck_text, created_at, users(email)')                           
+      366 -        .eq('question_id', question.id)                       
+      367 -        .order('created_at', { ascending: false })            
+      368 -                                                              
+      369 -      if (fbErr) throw fbErr                                  
+      370 -                                                              
+      371 -      setFeedbackItems(                                       
+      372 -        (data || []).map((f: any) => ({                       
+      373 -          id: f.id,                                           
+      374 -          user_email: f.users?.email || 'Unknown',            
+      375 -          difficulty_rating: f.difficulty_rating,             
+      376 -          quality_rating: f.quality_rating,                   
+      377 -          feedback_text: f.feedback_text,                     
+      378 -          created_at: f.created_at,                           
+      379 -        }))                                                   
+      380 -      )                                                       
+      381 -    } catch (err: any) {                                      
+      382 -      console.error('Load feedback error:', err)              
+      383 -    } finally {                                               
+      384 -      setLoadingFeedback(false)                               
+      385 -    }                                                         
+      386 -  }                                                           
+      387 -                                                              
+      388 -  function closeFeedback() {                                  
+      389 -    setFeedbackQuestion(null)                                 
+      390 -    setFeedbackItems([])                                      
+      391 -  }                                                           
+      392 -                                                              
+      393 -  // ---------------------------------------------------------
+          -------------------                                            
+      394 -  // Bulk import                                              
+      395 -  // ---------------------------------------------------------
+          -------------------                                            
+      396 -                                                              
+      397 -  function openImportModal() {                                
+      398 -    setShowImportModal(true)                                  
+      399 -    setImportData(null)                                       
+      400 -    setImportErrors([])                                       
+      401 -    setImportSuccess(null)                                    
+      402 -    if (fileInputRef.current) fileInputRef.current.value = '' 
+      403 -  }                                                           
+      404 -                                                              
+      405 -  function closeImportModal() {                               
+      406 -    setShowImportModal(false)                                 
+      407 -    setImportData(null)                                       
+      408 -    setImportErrors([])                                       
+      409 -    setImportSuccess(null)                                    
+      410 -    if (fileInputRef.current) fileInputRef.current.value = '' 
+      411 -  }                                                           
+      412 -                                                              
+      413 -  async function handleFileSelect(e: React.ChangeEvent<HTMLInp
+          -utElement>) {                                                 
+      414 -    const file = e.target.files?.[0]                          
+      415 -    if (!file) return                                         
+      416 -                                                              
+      417 -    setImportData(null)                                       
+      418 -    setImportErrors([])                                       
+      419 -    setImportSuccess(null)                                    
+      420 -                                                              
+      421 -    if (!file.name.endsWith('.json')) {                       
+      422 -      setImportErrors(['File must be a .json file'])          
+      423 -      return                                                  
+      424 -    }                                                         
+      425 -    if (file.size > 5 * 1024 * 1024) {                        
+      426 -      setImportErrors(['File too large. Maximum size is 5MB'])
+      427 -      return                                                  
+      428 -    }                                                         
+      429 -                                                              
+      430 -    try {                                                     
+      431 -      const text = await file.text()                          
+      432 -      const json = JSON.parse(text)                           
+      433 -      const result = bulkImportSchema.safeParse(json)         
+      434 -      if (!result.success) {                                  
+      435 -        setImportErrors(result.error.issues.map(err =>        
+      436 -          `${err.path.join('.') || 'Root'}: ${err.message}`   
+      437 -        ))                                                    
+      438 -        return                                                
+      439 -      }                                                       
+      440 -      setImportData(result.data)                              
+      441 -    } catch (err: any) {                                      
+      442 -      if (err instanceof SyntaxError) {                       
+      443 -        setImportErrors(['Invalid JSON file. Please check the 
+          -file format.'])                                               
+      444 -      } else {                                                
+      445 -        setImportErrors([err.message || 'Failed to read file']
+          -)                                                             
+      446 -      }                                                       
+      447 -    }                                                         
+      448 -  }                                                           
+      449 -                                                              
+      450 -  async function handleImport() {                             
+      451 -    if (!importData || !user) return                          
+      452 -                                                              
+      453 -    setImporting(true)                                        
+      454 -    setImportErrors([])                                       
+      455 -    setImportSuccess(null)                                    
+      456 -                                                              
+      457 -    try {                                                     
+      458 -      // Find or create topic                                 
+      459 -      let topicId: string                                     
+      460 -      const existingTopic = topics.find(t => t.name.toLowerCas
+          -e() === importData.topic.toLowerCase())                       
+      461 -                                                              
+      462 -      if (existingTopic) {                                    
+      463 -        topicId = existingTopic.id                            
+      464 -      } else {                                                
+      465 -        const { data: newTopic, error: topicError } = await su
+          -pabase                                                        
+      466 -          .from('topics')                                     
+      467 -          .insert({ name: importData.topic.trim() })          
+      468 -          .select()                                           
+      469 -          .single()                                           
+      470 -        if (topicError) throw new Error(`Failed to create topi
+          -c: ${topicError.message}`)                                    
+      471 -        topicId = newTopic.id                                 
+      472 -      }                                                       
+      473 -                                                              
+      474 -      // Insert questions in batches                          
+      475 -      const BATCH_SIZE = 50                                   
+      476 -      let successCount = 0                                    
+      477 -      const errors: string[] = []                             
+      478 -                                                              
+      479 -      for (let i = 0; i < importData.questions.length; i += BA
+          -TCH_SIZE) {                                                   
+      480 -        const batch = importData.questions.slice(i, i + BATCH_
+          -SIZE)                                                         
+      481 -                                                              
+      482 -        for (const [idx, q] of batch.entries()) {             
+      483 -          try {                                               
+      484 -            const { data: question, error: qError } = await su
+          -pabase                                                        
+      485 -              .from('questions')                              
+      486 -              .insert({                                       
+      487 -                topic_id: topicId,                            
+      488 -                question_text: q.question_text.trim(),        
+      489 -                explanation_text: q.explanation_text?.trim() |
+          -| null,                                                       
+      490 -                difficulty_level: q.difficulty_level || null, 
+      491 -                created_by_admin_id: user.id,                 
+      492 -              })                                              
+      493 -              .select()                                       
+      494 -              .single()                                       
+      495 -                                                              
+      496 -            if (qError) throw qError                          
+      497 -                                                              
+      498 -            const choicesData = q.answer_choices.map(c => ({  
+      499 -              question_id: question.id,                       
+      500 -              choice_letter: c.letter,                        
+      501 -              choice_text: c.text.trim(),                     
+      502 -              is_correct: c.is_correct,                       
+      503 -            }))                                               
+      504 -                                                              
+      505 -            const { error: cError } = await supabase.from('ans
+          -wer_choices').insert(choicesData)                             
+      506 -                                                              
+      507 -            if (cError) {                                     
+      508 -              await supabase.from('questions').delete().eq('id
+          -', question.id)                                               
+      509 -              throw cError                                    
+      510 -            }                                                 
+      511 -                                                              
+      512 -            successCount++                                    
+      513 -          } catch (err: any) {                                
+      514 -            errors.push(`Question ${i + idx + 1}: ${err.messag
+          -e}`)                                                          
+      515 -          }                                                   
+      516 -        }                                                     
+      517 -      }                                                       
+      518 -                                                              
+      519 -      if (successCount > 0) {                                 
+      520 -        setImportSuccess({ count: successCount, topic: importD
+          -ata.topic })                                                  
+      521 -        await loadQuestions()                                 
+      522 -      }                                                       
+      523 -      if (errors.length > 0) {                                
+      524 -        setImportErrors(errors)                               
+      525 -      }                                                       
+      526 -      if (successCount === importData.questions.length) {     
+      527 -        setTimeout(() => closeImportModal(), 2000)            
+      528 -      }                                                       
+      529 -    } catch (err: any) {                                      
+      530 -      console.error('Import error:', err)                     
+      531 -      setImportErrors([err.message || 'Failed to import questi
+          -ons'])                                                        
+      532 -    } finally {                                               
+      533 -      setImporting(false)                                     
+      534 -    }                                                         
+      535 -  }                                                           
+      536 -                                                              
+      537 -  // ---------------------------------------------------------
+          -------------------                                            
+      350    // Derived
+      351    // ---------------------------------------------------------
+           ------------------
+      352  
+
+● Update(src\questions\QuestionsAdmin.tsx)
+  ⎿  Added 1 line, removed 1 line
+      374          </div>
+      375          <div className="flex gap-2">
+      376            <button
+      377 -            onClick={() => { setImportTab('docx'); openImportM
+          -odal() }}                                                     
+      377 +            onClick={() => { setImportTab('docx'); setShowImpo
+          +rtModal(true) }}                                              
+      378              className="bg-purple-600 text-white px-4 py-2 roun
+           ded-lg hover:bg-purple-700 transition-colors font-medium"
+      379            >
+      380              Import DOCX
+
+● Update(src\questions\QuestionsAdmin.tsx)
+  ⎿  Added 1 line, removed 1 line
+      380              Import DOCX
+      381            </button>
+      382            <button
+      383 -            onClick={() => { setImportTab('json'); openImportM
+          -odal() }}                                                     
+      383 +            onClick={() => { setImportTab('json'); setShowImpo
+          +rtModal(true) }}                                              
+      384              className="bg-green-600 text-white px-4 py-2 round
+           ed-lg hover:bg-green-700 transition-colors font-medium"
+      385            >
+      386              Import JSON
+
+● Update(src\questions\QuestionsAdmin.tsx)
+  ⎿  Added 1 line, removed 1 line
+      515                  </div>
+      516                  <div className="flex gap-2 flex-shrink-0">
+      517                    <button
+      518 -                    onClick={() => openFeedback(q)}           
+      518 +                    onClick={() => setFeedbackQuestion(q)}    
+      519                      className="px-3 py-1 text-sm text-purple-6
+           00 hover:bg-purple-50 rounded transition-colors"
+      520                    >
+      521                      Feedback
+
+  Ran 4 shell commands (ctrl+o to expand)
+
+● The splice left a syntax error near the end — let me inspect:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Update(src\questions\QuestionsAdmin.tsx)
+  ⎿  Removed 1 line
+      792        {/* Bulk Import Modal                                   
+                           */}
+      793        {/* ----------------------------------------------------
+           -------------- */}
+      794        {showImportModal && (
+      795 -      {showImportModal && (                                   
+      795          <BulkImportModal
+      796            initialTab={importTab}
+      797            topics={topics}
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● Write(supabase\README.md)
+  ⎿  Wrote 39 lines to supabase\README.md
+       1 # Supabase — schema source control
+       2 
+         test()`
+       4 functions, triggers) currently lives **only** in the Supabase da
+         shboard.
+         ersioned,
+       6 reviewable, and reproducible.
+       7 
+       9 
+      10 ```bash
+     … +40 lines (ctrl+o to expand)
+
+● Write(supabase\manual\fix_feedback_admin_rls.sql)  ⎿  Wrote 60 lines to supabase\manual\fix_feedback_admin_rls.sql
+       1 -- fix_feedback_admin_rls.sql
+       3 -- Context: the admin "Question Feedback" modal came back empty 
+         even though
+          email via
+         ete result:
+       6 --
+         CT policy,
+       8 --      so an admin only sees their own feedback (or nothing).
+         he frontend
+         ws, but
+     … +63 lines (ctrl+o to expand)
+
+● Write(supabase\manual\guest_cleanup.sql)
+  ⎿  Wrote 53 lines to supabase\manual\guest_cleanup.sql
+       1 -- guest_cleanup.sql
+       2 --
+         permanent
+       4 -- anonymous row in auth.users plus test attempts/responses. Lef
+         t alone this
+         ous accounts
+       6 -- older than 30 days.
+       7 --
+       9 -- (Dashboard > Database > Extensions > pg_cron).
+      10 --
+     … +54 lines (ctrl+o to expand)
+
+● Now updating the README to reflect everything:
+
+● Update(README.md)
+  ⎿  Added 17 lines, removed 1 line
+      13  | Frontend | React 19, TypeScript, Vite 7 |
+      14  | Styling | Tailwind CSS v4 (via `@tailwindcss/vite` plugin) |
+      15  | Routing | React Router v7 (`createBrowserRouter`) |
+      16 -| Server state | TanStack React Query v5 (installed, not yet us
+         -ed in any component) |                                         
+      16  | Validation | Zod v4 |
+      17  | Backend | Supabase (Auth, PostgreSQL + RLS, Storage) |
+      18 +| Lint | ESLint 10 flat config (`eslint.config.js`) + typescrip
+         +t-eslint + react-hooks |                                       
+      19 +| Tests | Vitest (config lives in `vite.config.ts` under `test`
+         +) |                                                            
+      20 +| CI | GitHub Actions (`.github/workflows/ci.yml`): lint → type
+         +check → test → build |                                         
+      21  | Path alias | `@/` → `src/` (configured in both `vite.config.t
+          s` and `tsconfig.app.json`) |
+      22  | PDF parsing | pdf.js 3.11 (loaded from CDN at runtime — not b
+          undled) |
+      23  | DOCX parsing | jszip (dynamic import) + browser DOMParser |
+      24  
+      25 +### Scripts                                                    
+      26 +                                                               
+      27 +```bash                                                        
+      28 +npm run dev        # Vite dev server                           
+      29 +npm run build      # tsc -b (real typecheck) + vite build      
+      30 +npm run typecheck  # tsc -b only                               
+      31 +npm run lint       # eslint . (0 errors required; warnings advi
+         +sory)                                                          
+      32 +npm test           # vitest run (parser regression suite)      
+      33 +```                                                            
+      34 +                                                               
+      35 +> Note: `build` previously ran `tsc --noEmit` against the solut
+         +ion-style root                                                 
+      36 +> tsconfig, which typechecks **zero files**. It now runs `tsc -
+         +b`, which                                                      
+      37 +> checks everything — keep it that way.                        
+      38 +                                                               
+      39  ---
+      40  
+      41  ## 3. Project File Tree
+
+● Update(README.md)
+  ⎿  Added 34 lines, removed 19 lines
+       43  ```
+       44  practice_tests\
+       45  ├── .env.local                          ← Supabase URL + anon 
+           key (do not commit)
+       46 +├── .github\workflows\ci.yml            ← CI: lint → typecheck
+          + → test → build                                               
+       47  ├── .gitignore
+       48 +├── eslint.config.js                    ← ESLint flat config  
+       49  ├── index.html                          ← Vite entry point, mo
+           unts src/main.tsx
+       48 -├── package.json                        ← type: module, script
+          -s: dev/build/preview                                          
+       50 +├── package.json                        ← type: module; script
+          +s: dev/build/typecheck/lint/test/preview                      
+       51  ├── package-lock.json
+       50 -├── vite.config.ts                      ← React plugin, Tailwi
+          -nd plugin, @/ alias                                           
+       51 -├── tsconfig.json                                             
+       52 -├── tsconfig.app.json                   ← covers src/, has @/ 
+          -path alias                                                    
+       52 +├── vite.config.ts                      ← React plugin, Tailwi
+          +nd plugin, @/ alias, Vitest config                            
+       53 +├── tsconfig.json                       ← solution-style root 
+          +(references app + node)                                       
+       54 +├── tsconfig.app.json                   ← covers src/, @/ alia
+          +s, vite/client types                                          
+       55  ├── tsconfig.node.json                  ← covers vite.config.t
+           s only
+       56 +├── supabase\                                                 
+       57 +│   ├── README.md                       ← how to pull the sche
+          +ma into migrations                                            
+       58 +│   └── manual\                         ← pending one-off SQL 
+          +(RLS fix, guest cleanup)                                      
+       59  └── src\
+       60      ├── index.css                       ← Tailwind entry (@imp
+           ort "tailwindcss")
+       61      ├── main.tsx                        ← React mount into #ro
+           ot, imports CSS, wraps providers
+       62      ├── app\
+       63      │   ├── App.tsx                     ← Renders <RouterProvi
+           der router={router} />
+       59 -    │   ├── providers.tsx               ← Wraps with AuthProvi
+          -der + QueryClientProvider                                     
+       64 +    │   ├── providers.tsx               ← Wraps with AuthProvi
+          +der                                                           
+       65      │   └── router.tsx                  ← All routes (see Sect
+           ion 4)
+       66      ├── auth\
+       67      │   ├── AuthProvider.tsx            ← Session bootstrap + 
+           role fetch from DB
+       63 -    │   ├── ProtectedRoute.tsx          ← Route guard (user + 
+          -optional requireAdmin)                                        
+       68 +    │   ├── ProtectedRoute.tsx          ← Route guard (require
+          +Admin / allowGuest)                                           
+       69      │   └── useAuth.ts                  ← Re-exports useAuth f
+           rom AuthProvider
+       70      ├── lib\
+       71      │   ├── env.ts                      ← Runtime guard for re
+           quired env vars
+       72      │   └── supabase.ts                 ← Single Supabase clie
+           nt instance
+       73      ├── pages\
+       69 -    │   ├── Login.tsx                   ← Login form with erro
+          -r handling                                                    
+       70 -    │   ├── Register.tsx                ← Registration form wi
+          -th error handling                                             
+       74 +    │   ├── Login.tsx / Register.tsx    ← Auth forms          
+       75 +    │   ├── ForgotPassword.tsx          ← Sends password-recov
+          +ery email                                                     
+       76 +    │   ├── ResetPassword.tsx           ← Recovery-token landi
+          +ng (NOT behind ProtectedRoute)                                
+       77 +    │   ├── ChangePassword.tsx          ← Change password (ful
+          +l session required)                                           
+       78 +    │   ├── GuestLanding.tsx            ← /guest: anonymous si
+          +gn-in + TestConfigForm                                        
+       79      │   ├── Dashboard.tsx               ← User landing: TestCo
+           nfigForm + test history table
+       80      │   ├── Admin.tsx                   ← Admin panel: tabbed 
+           Topics / Questions / Analytics
+       73 -    │   └── Results.tsx                 ← Post-test results: s
+          -core summary + question review                                
+       81 +    │   ├── Results.tsx                 ← Post-test results: s
+          +core summary + question review                                
+       82 +    │   ├── NotFound.tsx                ← 404 catch-all       
+       83 +    │   └── RouteError.tsx              ← Router errorElement 
+          +(crash → recoverable screen)                                  
+       84      ├── analytics\
+       85      │   ├── QuestionAnalytics.tsx       ← Paginated question s
+           tats table + detail modal
+       86      │   └── UserAnalytics.tsx           ← User stats table + d
+           etail modal
+       87      ├── questions\
+       78 -    │   ├── question.schema.ts          ← Zod schema for quest
+          -ion create/edit form                                          
+       79 -    │   ├── QuestionsAdmin.tsx          ← Admin CRUD for quest
+          -ions (with image upload)                                      
+       80 -    │   ├── useQuestions.ts             ← Hook for question da
+          -ta fetching                                                   
+       81 -    │   └── DocxImportStudyguides.tsx   ← FBLA study guide bul
+          -k importer (DOCX + PDF)                                       
+       88 +    │   ├── question.schema.ts          ← Zod schemas (questio
+          +n form + JSON bulk import)                                    
+       89 +    │   ├── QuestionsAdmin.tsx          ← Admin CRUD list + cr
+          +eate/edit/delete modals                                       
+       90 +    │   ├── QuestionFeedbackModal.tsx   ← Per-question user fe
+          +edback viewer (fetches own data)                              
+       91 +    │   ├── BulkImportModal.tsx         ← JSON/DOCX import mod
+          +al (owns import state + logic)                                
+       92 +    │   ├── DocxImport.tsx              ← Generic DOCX questio
+          +n importer                                                    
+       93 +    │   ├── DocxImportStudyguides.tsx   ← FBLA study guide imp
+          +orter UI (see Section 8)                                      
+       94 +    │   └── parse\                                            
+       95 +    │       ├── studyguideParser.ts     ← Pure parsing logic (
+          +DOCX/PDF study guides)                                        
+       96 +    │       └── studyguideParser.test.ts← Vitest regression su
+          +ite for OCR quirks                                            
+       97      ├── tests\
+       98      │   ├── test.schema.ts              ← Zod schema for test 
+           config form
+       99      │   ├── TestConfig.tsx              ← Test setup form (top
+           ic, count, timer)
+       85 -    │   ├── TestShell.tsx               ← Full test-taking int
+          -erface (see Section 7)                                        
+      100 +    │   ├── testTypes.ts                ← Shared types/constan
+          +ts/helpers (NAVY, orderChoices)                               
+      101 +    │   ├── useTestAttempt.ts           ← All test-attempt dat
+          +a/persistence/timer logic                                     
+      102 +    │   ├── QuestionCard.tsx            ← Single-question card
+          + (choices, eliminate, mark)                                   
+      103 +    │   ├── TestShell.tsx               ← Test-taking layout (
+          +see Section 7)                                                
+      104      │   ├── PracticeShell.tsx           ← Practice mode varian
+           t (/practice route)
+      105      │   └── useGenerateTest.ts          ← Hook wrapping the ge
+           nerate_test() RPC
+       88 -    ├── topics\                                               
+       89 -    │   ├── topic.schema.ts             ← Zod schema for topic
+          - form                                                         
+       90 -    │   ├── TopicsAdmin.tsx             ← Admin CRUD for topic
+          -s                                                             
+       91 -    │   └── useTopics.ts                ← Hook for topic data 
+          -fetching                                                      
+       92 -    └── ui\                             ← Shared UI primitives
+      106 +    └── topics\                                               
+      107 +        └── TopicsAdmin.tsx             ← Admin CRUD for topic
+          +s                                                             
+      108  ```
+      109  
+      110  ---
+
+● Update(README.md)
+  ⎿  Added 12 lines, removed 5 lines
+      111  
+      112  ## 4. Routes
+      113  
+      114 -Defined in `src/app/router.tsx`:                              
+      114 +Defined in `src/app/router.tsx`. All routes sit under a pathle
+          +ss parent route                                               
+      115 +whose `errorElement` renders `RouteError`, so a render crash s
+          +hows a                                                        
+      116 +recoverable screen instead of a blank page.                   
+      117  
+      118  | Path | Component | Guard |
+      119  |---|---|---|
+      120  | `/login` | `Login` | Public |
+      121  | `/register` | `Register` | Public |
+      120 -| `/` | `Dashboard` | Auth required |                         
+      121 -| `/test/:id` | `TestShell` | Auth required |                 
+      122 -| `/practice` | `PracticeShell` | Auth required |             
+      123 -| `/results/:id` | `Results` | Auth required |                
+      122 +| `/forgot-password` | `ForgotPassword` | Public |            
+      123 +| `/reset-password` | `ResetPassword` | Public (arrives with r
+          +ecovery token — must NOT be behind ProtectedRoute) |          
+      124 +| `/guest` | `GuestLanding` | Public (page performs anonymous 
+          +sign-in itself) |                                             
+      125 +| `/` | `Dashboard` | Full (non-anonymous) session |          
+      126 +| `/change-password` | `ChangePassword` | Full (non-anonymous)
+          + session |                                                    
+      127 +| `/practice` | `PracticeShell` | Full (non-anonymous) session
+          + |                                                            
+      128 +| `/test/:id` | `TestShell` | Session required; anonymous allo
+          +wed (`allowGuest`) |                                          
+      129 +| `/results/:id` | `Results` | Session required; anonymous all
+          +owed (`allowGuest`) |                                         
+      130  | `/admin` | `Admin` | Auth + admin role required |
+      131 +| `*` | `NotFound` | Public |                                 
+      132  
+      133  The `:id` in `/test/:id` and `/results/:id` is the `attempt_id
+           ` UUID returned by `generate_test()`. `TestConfig` calls `useG
+           enerateTest`, then navigates to `/test/:id`.
+      134  
+
+● Update(README.md)
+  ⎿  Added 17 lines
+      185  
+      186  Bucket `question-images`: public, 5 MB limit. Authenticated us
+           ers can upload. Only admins can delete.
+      187  
+      188 +### Schema source control                                     
+      189 +                                                              
+      190 +The schema above lives only in the Supabase dashboard. `supaba
+          +se/README.md`                                                 
+      191 +documents how to pull it into versioned migrations with the Su
+          +pabase CLI                                                    
+      192 +(`supabase login` → `link` → `db pull`) — do this once, then m
+          +ake all schema                                                
+      193 +changes as migration files.                                   
+      194 +                                                              
+      195 +`supabase/manual/` holds two pending SQL scripts to review and
+          + run in the                                                   
+      196 +dashboard SQL editor:                                         
+      197 +                                                              
+      198 +- **`fix_feedback_admin_rls.sql`** — the admin feedback modal 
+          +returned empty                                                
+      199 +  because of missing admin-read RLS policies (see Section 12).
+          + Diagnostic +                                                 
+      200 +  fix.                                                        
+      201 +- **`guest_cleanup.sql`** — every `/guest` visit creates a per
+          +manent                                                        
+      202 +  anonymous `auth.users` row; this schedules a nightly `pg_cro
+          +n` purge of                                                   
+      203 +  anonymous accounts older than 30 days.                      
+      204 +                                                              
+      205  ---
+      206  
+      207  ## 6. Feature Status
+
+● Update(README.md)
+  ⎿  Added 3 lines, removed 1 line
+      315  
+      316  **Refs for stale-closure-sensitive callbacks:** `responsesRef`
+            / `currentIndexRef` in `TestShell`. Use this pattern whenever
+            a `setInterval` or event listener callback needs to read curr
+           ent state without being torn down on every render.
+      317  
+      318 -**Direct Supabase calls:** Components call `supabase.from(...)
+          -` or `supabase.rpc(...)` directly. React Query installed but n
+          -ot in use. Do not introduce it without a concrete reason.     
+      318 +**Direct Supabase calls:** Components call `supabase.from(...)
+          +` or `supabase.rpc(...)` directly. (React Query was removed in
+          + July 2026 — it was installed but never used. Do not re-introd
+          +uce it without a concrete reason.)                            
+      319  
+      320 +**Embedded joins vs RLS:** When embedding a related table in a
+          + select (e.g. `users(email)` on feedback), use a LEFT join unl
+          +ess you *want* RLS on the related table to filter out parent r
+          +ows. `users!inner(email)` silently dropped every feedback row 
+          +whose author the admin couldn't read — that was the "feedback 
+          +not working" bug.                                             
+      321 +                                                              
+      322  **`@/` imports only:** Never use relative paths that escape th
+           e current directory.
+      323  
+      324  **Tailwind only for styling:** No inline styles except where T
+           ailwind cannot express dynamic values (e.g. the `NAVY` constan
+           t in `TestShell`).
+
+● Update(README.md)
+  ⎿  Added 6 lines
+      228  
+      229  Full test-taking UI. Receives `attempt_id` from the URL param 
+           (`/test/:id`).
+      230  
+      231 +Split across four files (July 2026): `TestShell.tsx` is layout
+          + + report-issue                                               
+      232 +modal only; **all data loading, persistence, timer, and naviga
+          +tion logic                                                    
+      233 +lives in `useTestAttempt.ts`**; the per-question card is `Ques
+          +tionCard.tsx`;                                                
+      234 +shared types/constants/helpers are in `testTypes.ts`. The beha
+          +vioral notes                                                  
+      235 +below still apply — they now describe the hook.               
+      236 +                                                              
+      237  **Data loading:** Loads `test_attempts` (timer config + `start
+           ed_at`), `attempt_questions` (ordered by `position`), `answer_
+           choices` (bulk fetch for all question IDs in one query), and `
+           question_responses` in sequence. Sets `started_at` on first lo
+           ad if not already set (safe on refresh).
+      238  
+      239  **View modes:** `'one'` (default — one question at a time with
+            prev/next), `'all'` (scrollable list, palette buttons scroll 
+           to question), `'review'` (only marked questions; snaps to firs
+           t marked on mode switch; shows message if none marked).
+
+● Update(README.md)
+  ⎿  Added 4 lines
+      257  
+      258  **Theme:** Navy `#1a2e5a` defined as `const NAVY` at the top o
+           f the file. Applied via inline `style` props where Tailwind ca
+           nnot express dynamic values.
+      259  
+      260 +### `PracticeShell` (`src/tests/PracticeShell.tsx`)           
+      261 +                                                              
+      262 +Untimed, unsaved practice mode driven by query params (`/pract
+          +ice?topic=<id>&count=<n>`; `count=0` = infinite). Loads the wh
+          +ole topic's questions client-side, Fisher-Yates-shuffles the p
+          +ool **and caps it at the requested count** in finite mode, shu
+          +ffles choice order per question, and gives immediate per-quest
+          +ion feedback after submit. Finite mode ends with a summary scr
+          +een (score, percent, Practice Again / exit). Requesting more q
+          +uestions than the topic has shows a non-blocking amber notice 
+          +— never route that through `setError`, which renders the full 
+          +error screen and locks the student out.                       
+      263 +                                                              
+      264  ### `Results` (`src/pages/Results.tsx`)
+      265  
+      266  Loads attempt metadata (with ownership check — `user_id === us
+           er.id` as a frontend guard on top of RLS), `attempt_questions`
+            for position ordering, `question_responses`, questions, and c
+           hoices. Redirects to `/test/:id` if `completed_at` is null. Di
+           splays choices in `displayed_choices_order` (the shuffled orde
+           r the user saw). Correct answer = green border; user's wrong a
+           nswer = red border; unanswered = gray badge.
+
+● Update(README.md)
+  ⎿  Added 6 lines
+      293  
+      294  ## 8. FBLA Study Guide Importer
+      295  
+      296 +All parsing logic is a pure module — `src/questions/parse/stud
+          +yguideParser.ts`                                              
+      297 +— with a Vitest regression suite (`studyguideParser.test.ts`) 
+          +that pins every                                               
+      298 +OCR quirk listed below with real examples. `DocxImportStudygui
+          +des.tsx` is now                                               
+      299 +UI only. **When changing any parser regex, run `npm test` — ea
+          +ch test case                                                  
+      300 +corresponds to an artifact actually seen in the real guides.**
+      301 +                                                              
+      302  ### Supported formats
+      303  - **DOCX:** 2017–20 format (questions `1)`, choices `A)`); 201
+           0–13 format (questions `1.`, choices `a.` with optional space 
+           after dot). Answer keys in 3-column Word tables.
+      304  - **PDF:** Same guides in PDF form including the 400-page comb
+           ined document. Text extracted via pdf.js from CDN. Answer keys
+            are plain text paragraphs.
+
+● Update(README.md)
+  ⎿  Added 25 lines, removed 1 line
+      419  
+      420  ### 11.4 Admin Tooling
+      421  - JSON bulk import (alternative to study guide importer)
+      422 -- CLI tool for bulk operations outside the browser            
+      422   No newline at end of file
+      423 +- CLI tool for bulk operations outside the browser            
+      424 +                                                              
+      425 +---                                                           
+      426 +                                                              
+      427 +## 12. July 2026 Overhaul — Fixes and Housekeeping            
+      428 +                                                              
+      429 +A hardening pass (2026-07-07) made these changes. Context that
+          + matters going forward:                                       
+      430 +                                                              
+      431 +### Bugs fixed                                                
+      432 +- **Admin feedback modal empty ("feedback not working")** — tw
+          +o stacked causes: (1) the render still used `f.user_email` aft
+          +er the field was renamed, and the broken build gate (below) hi
+          +d the type error; (2) `users!inner(email)` let RLS on `users` 
+          +silently filter out all feedback rows. Fixed client-side with 
+          +a LEFT join + restored `question_id` filter (`QuestionFeedback
+          +Modal.tsx`). **DB side still needs verification** — run `supab
+          +ase/manual/fix_feedback_admin_rls.sql`.                       
+      433 +- **Practice mode ("rosha bug")** — finite mode ignored the re
+          +quested count (served the whole topic, "Question 3 of 50" when
+          + 10 were requested, never ended); requesting more questions th
+          +an available rendered a blocking error screen; incorrect-answe
+          +r feedback previously named the original (pre-shuffle) choice 
+          +letter. Finite mode now slices the pool, ends with a score sum
+          +mary, and the shortage notice is non-blocking.                
+      434 +- **Typecheck was a no-op** — `tsc --noEmit` against the solut
+          +ion-style root tsconfig checks zero files. ~25 latent type err
+          +ors existed; all fixed, and `build` now runs `tsc -b`.        
+      435 +- **No 404 / error boundary** — unknown URLs now render `NotFo
+          +und`; render crashes render `RouteError` instead of a blank pa
+          +ge.                                                           
+      436 +                                                              
+      437 +### Housekeeping done                                         
+      438 +- Removed unused React Query dependency and empty placeholder 
+          +files (`useQuestions.ts`, `useTopics.ts`, `topic.schema.ts`). 
+      439 +- Fixed `.gitignore`: removed `*.txt` (silently ignored any te
+          +xt asset) and a stray `*.` pattern; added `*.tsbuildinfo`.    
+      440 +- Added ESLint (flat config), Vitest, and CI. The React-Compil
+          +er-era hooks rules (`set-state-in-effect`, `immutability`) are
+          + downgraded to warnings — fix opportunistically when touching 
+          +those files.                                                  
+      441 +                                                              
+      442 +### Still to do (needs dashboard access / a human decision)   
+      443 +1. Run `supabase/manual/fix_feedback_admin_rls.sql` (diagnosti
+          +c first) and verify the feedback modal end-to-end.            
+      444 +2. Run `supabase login` → `link` → `db pull` to capture the sc
+          +hema into `supabase/migrations/` (see `supabase/README.md`).  
+      445 +3. Enable `pg_cron` and apply `supabase/manual/guest_cleanup.s
+          +ql`.                                                          
+      446 +4. **Move this repo out of OneDrive** (e.g. `C:\dev\practice_t
+          +ests`). `node_modules` + `.git` under OneDrive cause sync chur
+          +n, file locks, and slow installs. Alternatively right-click th
+          +e folder → "Free up space" / exclude from sync.               
+      447 +5. When deploying, remember the SPA rewrite rule (`/* → /index
+          +.html`) — the app uses `createBrowserRouter`.                 
+      448   No newline at end of file
+
+● Write(spec\TODO.md)
+  ⎿  Error writing file
+
+  Read 1 file (ctrl+o to expand)
+
+● Write(spec\TODO.md)
+  ⎿  Added 20 lines, removed 1 line
+       1 -fix practiceshell 318: letter is randomized but                
+       1   No newline at end of file
+       2 +# TODO                                                         
+       3 +                                                               
+       4 +Updated 2026-07-07. Previous item (PracticeShell line 318 — ran
+         +domized letter                                                 
+       5 +in the incorrect-answer message) is fixed, along with finite-mo
+         +de count,                                                      
+       6 +completion screen, and the blocking shortage error. See README 
+         +Section 12.                                                    
+       7 +                                                               
+       8 +## Needs dashboard access                                      
+       9 +- [ ] Run `supabase/manual/fix_feedback_admin_rls.sql` (diagnos
+         +tic first),                                                    
+      10 +      then verify the admin feedback modal shows entries with a
+         +uthor emails.                                                  
+      11 +- [ ] `npx supabase login` → `link` → `db pull` to capture the 
+         +schema into                                                    
+      12 +      `supabase/migrations/` (instructions in `supabase/README.
+         +md`).                                                          
+      13 +- [ ] Enable pg_cron and apply `supabase/manual/guest_cleanup.s
+         +ql`.                                                           
+      14 +                                                               
+      15 +## Environment                                                 
+      16 +- [ ] Move the repo out of OneDrive (e.g. `C:\dev\practice_test
+         +s`).                                                           
+      17 +                                                               
+      18 +## Code quality (opportunistic)                                
+      19 +- [ ] Burn down the 24 ESLint warnings (react-hooks/set-state-i
+         +n-effect,                                                      
+      20 +      immutability, exhaustive-deps) when touching those files.
+      21 +- [ ] Consider code-splitting the admin bundle (Vite warns >500
+         + kB chunk).                                                    
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● One final smoke test — boot the dev server and confirm the app serves:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● All done and verified. Here's the full rundown:
+
+  Verification status
+
+  npm run lint — 0 errors · tsc -b — clean · npm test — 29/29 pass · npm run 
+  build — succeeds · dev server boots and serves the refactored modules.
+  Everything is uncommitted on vibes so you can review the diff first.
+
+  The big discovery: your build never typechecked
+
+  tsc --noEmit against the solution-style root tsconfig checks zero files. The
+  app had ~25 latent type errors hiding behind it — including the feedback bug.
+  The build script now runs tsc -b, and all errors are fixed.
+
+  Bugs fixed
+
+  - Feedback modal — three stacked problems: the render used f.user_email after
+  the field was renamed (invisible due to the dead typecheck), the debug commit
+  dropped the question_id filter (every modal showed all feedback), and the
+  original users!inner(email) join let RLS silently erase all rows. Fixed with a
+  LEFT join + restored filter in a new QuestionFeedbackModal.tsx. If it's still
+  empty after this, it's the missing admin RLS policy —
+  supabase/manual/fix_feedback_admin_rls.sql has a diagnostic and the fix to run
+  in the dashboard.
+  - Practice mode ("rosha bug") — finite mode ignored the requested count (all
+  50 topic questions when you asked for 10, no end screen ever), and asking for
+  more questions than exist rendered a blocking error screen. Now: pool is
+  capped, a completion screen shows score/percent with Practice Again, the
+  shortage shows a non-blocking amber notice, shuffles use Fisher-Yates, and the
+  broken disabled:hover: dynamic Tailwind class is gone. The letter-mismatch
+  message from your TODO was already half-fixed; the leftover dead code is
+  cleaned up.
+
+  Infrastructure added
+
+  - ESLint (flat config, typescript-eslint + react-hooks) + Vitest + GitHub 
+  Actions CI (lint → typecheck → test → build). The two new React-Compiler-era
+  hooks rules are warnings (24 exist) so real errors stay loud.
+  - Parser extracted & tested — all study-guide parsing moved to
+  src/questions/parse/studyguideParser.ts (pure, UI-free) with 29 regression
+  tests pinning every documented OCR quirk ("Intr oduction to... Answe r Key",
+  5) C15) A26) A, orphaned numbers, misread parens). Regex changes are now safe
+  to make.
+  - Routing hardening — * → NotFound page, and a router-level RouteError
+  boundary so a crash mid-test shows a recoverable screen instead of a white
+  page.
+  - File splits — TestShell 1066→456 lines (useTestAttempt hook + QuestionCard +
+  testTypes, logic moved verbatim); QuestionsAdmin 1292→803 (feedback +
+  bulk-import modals extracted); importer 1732→923 + parser module.
+  - Cleanup — React Query uninstalled (was never used), three empty placeholder
+  files deleted, .gitignore fixed (*.txt and stray *. removed). Note:
+  DocxImport.tsx was not deprecated after all — it's a separate generic importer
+  still rendered in the import modal, so it stays.
+
+  Docs
+
+  README rewritten where stale: real file tree, complete routes table, scripts
+  section, the LEFT-join-vs-RLS pattern, and a new Section 12 logging all of
+  this. spec/TODO.md replaced (the old one was a single truncated sentence).
+
+  What needs you (documented in TODO + README §12)
+
+  1. Run the RLS fix SQL in the dashboard, then check the feedback modal
+  end-to-end.
+  2. npx supabase login → link → db pull to capture your schema into migrations
+  — supabase/README.md walks through it (you can run the login via ! npx 
+  supabase login right here).
+  3. Enable pg_cron and apply supabase/manual/guest_cleanup.sql (guest accounts
+  currently accumulate forever).
+  4. Move the repo out of OneDrive — I didn't do this myself since it relocates
+  your working environment; it's a 2-minute manual move.
+
+  Want me to commit this (one commit or split by concern), or would you like to
+  review the diff first?
+
+✻ Cooked for 29m 16s
