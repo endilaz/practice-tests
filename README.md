@@ -13,12 +13,28 @@ A React + Supabase web app where students practice for FBLA competitions by taki
 | Frontend | React 19, TypeScript, Vite 7 |
 | Styling | Tailwind CSS v4 (via `@tailwindcss/vite` plugin) |
 | Routing | React Router v7 (`createBrowserRouter`) |
-| Server state | TanStack React Query v5 (installed, not yet used in any component) |
 | Validation | Zod v4 |
 | Backend | Supabase (Auth, PostgreSQL + RLS, Storage) |
+| Lint | ESLint 10 flat config (`eslint.config.js`) + typescript-eslint + react-hooks |
+| Tests | Vitest (config lives in `vite.config.ts` under `test`) |
+| CI | GitHub Actions (`.github/workflows/ci.yml`): lint → typecheck → test → build |
 | Path alias | `@/` → `src/` (configured in both `vite.config.ts` and `tsconfig.app.json`) |
 | PDF parsing | pdf.js 3.11 (loaded from CDN at runtime — not bundled) |
 | DOCX parsing | jszip (dynamic import) + browser DOMParser |
+
+### Scripts
+
+```bash
+npm run dev        # Vite dev server
+npm run build      # tsc -b (real typecheck) + vite build
+npm run typecheck  # tsc -b only
+npm run lint       # eslint . (0 errors required; warnings advisory)
+npm test           # vitest run (parser regression suite)
+```
+
+> Note: `build` previously ran `tsc --noEmit` against the solution-style root
+> tsconfig, which typechecks **zero files**. It now runs `tsc -b`, which
+> checks everything — keep it that way.
 
 ---
 
@@ -27,70 +43,92 @@ A React + Supabase web app where students practice for FBLA competitions by taki
 ```
 practice_tests\
 ├── .env.local                          ← Supabase URL + anon key (do not commit)
+├── .github\workflows\ci.yml            ← CI: lint → typecheck → test → build
 ├── .gitignore
+├── eslint.config.js                    ← ESLint flat config
 ├── index.html                          ← Vite entry point, mounts src/main.tsx
-├── package.json                        ← type: module, scripts: dev/build/preview
+├── package.json                        ← type: module; scripts: dev/build/typecheck/lint/test/preview
 ├── package-lock.json
-├── vite.config.ts                      ← React plugin, Tailwind plugin, @/ alias
-├── tsconfig.json
-├── tsconfig.app.json                   ← covers src/, has @/ path alias
+├── vite.config.ts                      ← React plugin, Tailwind plugin, @/ alias, Vitest config
+├── tsconfig.json                       ← solution-style root (references app + node)
+├── tsconfig.app.json                   ← covers src/, @/ alias, vite/client types
 ├── tsconfig.node.json                  ← covers vite.config.ts only
+├── supabase\
+│   ├── README.md                       ← how to pull the schema into migrations
+│   └── manual\                         ← pending one-off SQL (RLS fix, guest cleanup)
 └── src\
     ├── index.css                       ← Tailwind entry (@import "tailwindcss")
     ├── main.tsx                        ← React mount into #root, imports CSS, wraps providers
     ├── app\
     │   ├── App.tsx                     ← Renders <RouterProvider router={router} />
-    │   ├── providers.tsx               ← Wraps with AuthProvider + QueryClientProvider
+    │   ├── providers.tsx               ← Wraps with AuthProvider
     │   └── router.tsx                  ← All routes (see Section 4)
     ├── auth\
     │   ├── AuthProvider.tsx            ← Session bootstrap + role fetch from DB
-    │   ├── ProtectedRoute.tsx          ← Route guard (user + optional requireAdmin)
+    │   ├── ProtectedRoute.tsx          ← Route guard (requireAdmin / allowGuest)
     │   └── useAuth.ts                  ← Re-exports useAuth from AuthProvider
     ├── lib\
     │   ├── env.ts                      ← Runtime guard for required env vars
     │   └── supabase.ts                 ← Single Supabase client instance
     ├── pages\
-    │   ├── Login.tsx                   ← Login form with error handling
-    │   ├── Register.tsx                ← Registration form with error handling
+    │   ├── Login.tsx / Register.tsx    ← Auth forms
+    │   ├── ForgotPassword.tsx          ← Sends password-recovery email
+    │   ├── ResetPassword.tsx           ← Recovery-token landing (NOT behind ProtectedRoute)
+    │   ├── ChangePassword.tsx          ← Change password (full session required)
+    │   ├── GuestLanding.tsx            ← /guest: anonymous sign-in + TestConfigForm
     │   ├── Dashboard.tsx               ← User landing: TestConfigForm + test history table
     │   ├── Admin.tsx                   ← Admin panel: tabbed Topics / Questions / Analytics
-    │   └── Results.tsx                 ← Post-test results: score summary + question review
+    │   ├── Results.tsx                 ← Post-test results: score summary + question review
+    │   ├── NotFound.tsx                ← 404 catch-all
+    │   └── RouteError.tsx              ← Router errorElement (crash → recoverable screen)
     ├── analytics\
     │   ├── QuestionAnalytics.tsx       ← Paginated question stats table + detail modal
     │   └── UserAnalytics.tsx           ← User stats table + detail modal
     ├── questions\
-    │   ├── question.schema.ts          ← Zod schema for question create/edit form
-    │   ├── QuestionsAdmin.tsx          ← Admin CRUD for questions (with image upload)
-    │   ├── useQuestions.ts             ← Hook for question data fetching
-    │   └── DocxImportStudyguides.tsx   ← FBLA study guide bulk importer (DOCX + PDF)
+    │   ├── question.schema.ts          ← Zod schemas (question form + JSON bulk import)
+    │   ├── QuestionsAdmin.tsx          ← Admin CRUD list + create/edit/delete modals
+    │   ├── QuestionFeedbackModal.tsx   ← Per-question user feedback viewer (fetches own data)
+    │   ├── BulkImportModal.tsx         ← JSON/DOCX import modal (owns import state + logic)
+    │   ├── DocxImport.tsx              ← Generic DOCX question importer
+    │   ├── DocxImportStudyguides.tsx   ← FBLA study guide importer UI (see Section 8)
+    │   └── parse\
+    │       ├── studyguideParser.ts     ← Pure parsing logic (DOCX/PDF study guides)
+    │       └── studyguideParser.test.ts← Vitest regression suite for OCR quirks
     ├── tests\
     │   ├── test.schema.ts              ← Zod schema for test config form
     │   ├── TestConfig.tsx              ← Test setup form (topic, count, timer)
-    │   ├── TestShell.tsx               ← Full test-taking interface (see Section 7)
+    │   ├── testTypes.ts                ← Shared types/constants/helpers (NAVY, orderChoices)
+    │   ├── useTestAttempt.ts           ← All test-attempt data/persistence/timer logic
+    │   ├── QuestionCard.tsx            ← Single-question card (choices, eliminate, mark)
+    │   ├── TestShell.tsx               ← Test-taking layout (see Section 7)
     │   ├── PracticeShell.tsx           ← Practice mode variant (/practice route)
     │   └── useGenerateTest.ts          ← Hook wrapping the generate_test() RPC
-    ├── topics\
-    │   ├── topic.schema.ts             ← Zod schema for topic form
-    │   ├── TopicsAdmin.tsx             ← Admin CRUD for topics
-    │   └── useTopics.ts                ← Hook for topic data fetching
-    └── ui\                             ← Shared UI primitives
+    └── topics\
+        └── TopicsAdmin.tsx             ← Admin CRUD for topics
 ```
 
 ---
 
 ## 4. Routes
 
-Defined in `src/app/router.tsx`:
+Defined in `src/app/router.tsx`. All routes sit under a pathless parent route
+whose `errorElement` renders `RouteError`, so a render crash shows a
+recoverable screen instead of a blank page.
 
 | Path | Component | Guard |
 |---|---|---|
 | `/login` | `Login` | Public |
 | `/register` | `Register` | Public |
-| `/` | `Dashboard` | Auth required |
-| `/test/:id` | `TestShell` | Auth required |
-| `/practice` | `PracticeShell` | Auth required |
-| `/results/:id` | `Results` | Auth required |
+| `/forgot-password` | `ForgotPassword` | Public |
+| `/reset-password` | `ResetPassword` | Public (arrives with recovery token — must NOT be behind ProtectedRoute) |
+| `/guest` | `GuestLanding` | Public (page performs anonymous sign-in itself) |
+| `/` | `Dashboard` | Full (non-anonymous) session |
+| `/change-password` | `ChangePassword` | Full (non-anonymous) session |
+| `/practice` | `PracticeShell` | Full (non-anonymous) session |
+| `/test/:id` | `TestShell` | Session required; anonymous allowed (`allowGuest`) |
+| `/results/:id` | `Results` | Session required; anonymous allowed (`allowGuest`) |
 | `/admin` | `Admin` | Auth + admin role required |
+| `*` | `NotFound` | Public |
 
 The `:id` in `/test/:id` and `/results/:id` is the `attempt_id` UUID returned by `generate_test()`. `TestConfig` calls `useGenerateTest`, then navigates to `/test/:id`.
 
@@ -147,6 +185,23 @@ All IDs are `uuid` with `default gen_random_uuid()`. All tables have RLS enabled
 
 Bucket `question-images`: public, 5 MB limit. Authenticated users can upload. Only admins can delete.
 
+### Schema source control
+
+The schema above lives only in the Supabase dashboard. `supabase/README.md`
+documents how to pull it into versioned migrations with the Supabase CLI
+(`supabase login` → `link` → `db pull`) — do this once, then make all schema
+changes as migration files.
+
+`supabase/manual/` holds two pending SQL scripts to review and run in the
+dashboard SQL editor:
+
+- **`fix_feedback_admin_rls.sql`** — the admin feedback modal returned empty
+  because of missing admin-read RLS policies (see Section 12). Diagnostic +
+  fix.
+- **`guest_cleanup.sql`** — every `/guest` visit creates a permanent
+  anonymous `auth.users` row; this schedules a nightly `pg_cron` purge of
+  anonymous accounts older than 30 days.
+
 ---
 
 ## 6. Feature Status
@@ -173,6 +228,12 @@ Bucket `question-images`: public, 5 MB limit. Authenticated users can upload. On
 
 Full test-taking UI. Receives `attempt_id` from the URL param (`/test/:id`).
 
+Split across four files (July 2026): `TestShell.tsx` is layout + report-issue
+modal only; **all data loading, persistence, timer, and navigation logic
+lives in `useTestAttempt.ts`**; the per-question card is `QuestionCard.tsx`;
+shared types/constants/helpers are in `testTypes.ts`. The behavioral notes
+below still apply — they now describe the hook.
+
 **Data loading:** Loads `test_attempts` (timer config + `started_at`), `attempt_questions` (ordered by `position`), `answer_choices` (bulk fetch for all question IDs in one query), and `question_responses` in sequence. Sets `started_at` on first load if not already set (safe on refresh).
 
 **View modes:** `'one'` (default — one question at a time with prev/next), `'all'` (scrollable list, palette buttons scroll to question), `'review'` (only marked questions; snaps to first marked on mode switch; shows message if none marked).
@@ -195,6 +256,10 @@ Full test-taking UI. Receives `attempt_id` from the URL param (`/test/:id`).
 **Palette:** Always-visible footer. Yellow = marked for review (priority over green), green = answered, gray = unanswered. Navy border = current question (single/review modes only). In review mode, unmarked buttons are dimmed and non-navigable.
 
 **Theme:** Navy `#1a2e5a` defined as `const NAVY` at the top of the file. Applied via inline `style` props where Tailwind cannot express dynamic values.
+
+### `PracticeShell` (`src/tests/PracticeShell.tsx`)
+
+Untimed, unsaved practice mode driven by query params (`/practice?topic=<id>&count=<n>`; `count=0` = infinite). Loads the whole topic's questions client-side, Fisher-Yates-shuffles the pool **and caps it at the requested count** in finite mode, shuffles choice order per question, and gives immediate per-question feedback after submit. Finite mode ends with a summary screen (score, percent, Practice Again / exit). Requesting more questions than the topic has shows a non-blocking amber notice — never route that through `setError`, which renders the full error screen and locks the student out.
 
 ### `Results` (`src/pages/Results.tsx`)
 
@@ -228,6 +293,12 @@ Thin hook: `{ generateTest, loading, error }`. Calls `supabase.rpc('generate_tes
 
 ## 8. FBLA Study Guide Importer
 
+All parsing logic is a pure module — `src/questions/parse/studyguideParser.ts`
+— with a Vitest regression suite (`studyguideParser.test.ts`) that pins every
+OCR quirk listed below with real examples. `DocxImportStudyguides.tsx` is now
+UI only. **When changing any parser regex, run `npm test` — each test case
+corresponds to an artifact actually seen in the real guides.**
+
 ### Supported formats
 - **DOCX:** 2017–20 format (questions `1)`, choices `A)`); 2010–13 format (questions `1.`, choices `a.` with optional space after dot). Answer keys in 3-column Word tables.
 - **PDF:** Same guides in PDF form including the 400-page combined document. Text extracted via pdf.js from CDN. Answer keys are plain text paragraphs.
@@ -260,7 +331,9 @@ Finds or creates topic by name → inserts each valid question → inserts its a
 
 **Refs for stale-closure-sensitive callbacks:** `responsesRef` / `currentIndexRef` in `TestShell`. Use this pattern whenever a `setInterval` or event listener callback needs to read current state without being torn down on every render.
 
-**Direct Supabase calls:** Components call `supabase.from(...)` or `supabase.rpc(...)` directly. React Query installed but not in use. Do not introduce it without a concrete reason.
+**Direct Supabase calls:** Components call `supabase.from(...)` or `supabase.rpc(...)` directly. (React Query was removed in July 2026 — it was installed but never used. Do not re-introduce it without a concrete reason.)
+
+**Embedded joins vs RLS:** When embedding a related table in a select (e.g. `users(email)` on feedback), use a LEFT join unless you *want* RLS on the related table to filter out parent rows. `users!inner(email)` silently dropped every feedback row whose author the admin couldn't read — that was the "feedback not working" bug.
 
 **`@/` imports only:** Never use relative paths that escape the current directory.
 
@@ -347,3 +420,27 @@ Chrome, Firefox, Safari, Edge (latest) · iOS Safari, Android Chrome · Desktop,
 ### 11.4 Admin Tooling
 - JSON bulk import (alternative to study guide importer)
 - CLI tool for bulk operations outside the browser
+
+---
+
+## 12. July 2026 Overhaul — Fixes and Housekeeping
+
+A hardening pass (2026-07-07) made these changes. Context that matters going forward:
+
+### Bugs fixed
+- **Admin feedback modal empty ("feedback not working")** — two stacked causes: (1) the render still used `f.user_email` after the field was renamed, and the broken build gate (below) hid the type error; (2) `users!inner(email)` let RLS on `users` silently filter out all feedback rows. Fixed client-side with a LEFT join + restored `question_id` filter (`QuestionFeedbackModal.tsx`). **DB side still needs verification** — run `supabase/manual/fix_feedback_admin_rls.sql`.
+- **Practice mode ("rosha bug")** — finite mode ignored the requested count (served the whole topic, "Question 3 of 50" when 10 were requested, never ended); requesting more questions than available rendered a blocking error screen; incorrect-answer feedback previously named the original (pre-shuffle) choice letter. Finite mode now slices the pool, ends with a score summary, and the shortage notice is non-blocking.
+- **Typecheck was a no-op** — `tsc --noEmit` against the solution-style root tsconfig checks zero files. ~25 latent type errors existed; all fixed, and `build` now runs `tsc -b`.
+- **No 404 / error boundary** — unknown URLs now render `NotFound`; render crashes render `RouteError` instead of a blank page.
+
+### Housekeeping done
+- Removed unused React Query dependency and empty placeholder files (`useQuestions.ts`, `useTopics.ts`, `topic.schema.ts`).
+- Fixed `.gitignore`: removed `*.txt` (silently ignored any text asset) and a stray `*.` pattern; added `*.tsbuildinfo`.
+- Added ESLint (flat config), Vitest, and CI. The React-Compiler-era hooks rules (`set-state-in-effect`, `immutability`) are downgraded to warnings — fix opportunistically when touching those files.
+
+### Still to do (needs dashboard access / a human decision)
+1. Run `supabase/manual/fix_feedback_admin_rls.sql` (diagnostic first) and verify the feedback modal end-to-end.
+2. Run `supabase login` → `link` → `db pull` to capture the schema into `supabase/migrations/` (see `supabase/README.md`).
+3. Enable `pg_cron` and apply `supabase/manual/guest_cleanup.sql`.
+4. **Move this repo out of OneDrive** (e.g. `C:\dev\practice_tests`). `node_modules` + `.git` under OneDrive cause sync churn, file locks, and slow installs. Alternatively right-click the folder → "Free up space" / exclude from sync.
+5. When deploying, remember the SPA rewrite rule (`/* → /index.html`) — the app uses `createBrowserRouter`.
