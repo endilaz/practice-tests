@@ -37,3 +37,32 @@ delete the file or fold it into a proper migration once applied:
   modal showing no results (RLS on `question_feedback` / `users`).
 - `guest_cleanup.sql` — scheduled purge of old anonymous (guest) accounts
   and their test data.
+- `add_ai_generated.sql` — adds `questions.is_ai_generated` so AI-generated
+  questions can be badged in the UI. Required before using the AI generator.
+
+## `functions/` — Edge Functions
+
+### `generate-questions`
+
+Admin-only endpoint that generates candidate multiple-choice questions for a
+topic with an LLM, using the topic's existing questions as few-shot
+reference. It only returns candidates — the admin reviews/edits/approves them
+in the app, and approved questions are inserted client-side with
+`is_ai_generated = true`.
+
+Setup (one time):
+
+```bash
+# API key for the LLM provider (default provider: Anthropic)
+npx supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+
+# Optional: override the model (defaults to claude-haiku-4-5, the cheapest)
+npx supabase secrets set AI_MODEL=claude-haiku-4-5
+
+# Deploy
+npx supabase functions deploy generate-questions
+```
+
+To swap providers or models later, edit only
+`functions/generate-questions/provider.ts` — it exposes a single
+`generateCandidates()` function that the rest of the code depends on.

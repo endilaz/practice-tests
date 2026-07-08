@@ -104,7 +104,7 @@ export function useTestAttempt(attemptIdParam: string | undefined) {
       // 4. Questions ordered by position
       const { data: aqRows, error: aqErr } = await supabase
         .from('attempt_questions')
-        .select('question_id, position, questions(id, question_text)')
+        .select('question_id, position, questions(id, question_text, is_ai_generated)')
         .eq('attempt_id', attemptId)
         .order('position')
 
@@ -147,6 +147,7 @@ export function useTestAttempt(attemptIdParam: string | undefined) {
         id: r.questions.id,
         question_text: r.questions.question_text,
         position: r.position,
+        is_ai_generated: r.questions.is_ai_generated ?? false,
       })))
       setChoices(choiceRows as AnswerChoice[])
       // Cast via unknown: supabase-js cannot statically parse this select

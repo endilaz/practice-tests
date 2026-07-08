@@ -8,6 +8,7 @@ export type Question = {
   id: string
   question_text: string
   position: number
+  is_ai_generated: boolean
 }
 
 export type AnswerChoice = {
